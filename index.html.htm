@@ -1,0 +1,2764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fleet O&O Cost Analysis Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Barlow:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #f1f5f9;
+    --surface: #ffffff;
+    --surface2: #e8edf5;
+    --border: #cbd5e1;
+    --accent: #d97706;
+    --accent2: #2563eb;
+    --accent3: #059669;
+    --danger: #dc2626;
+    --warn: #ea580c;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --text-dim: #334155;
+    --excavator: #2563eb;
+    --dozer: #d97706;
+    --truck: #059669;
+    --roller: #7c3aed;
+    --loader: #db2777;
+    --support: #475569;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--surface);
+    border-bottom: 2px solid var(--accent);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .logo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: 1px;
+    color: var(--accent);
+  }
+  .logo span { color: var(--text); }
+  .header-badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .live-dot {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .live-dot::before {
+    content: '';
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--warn);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* NAV TABS */
+  .nav-tabs {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 12px 18px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--text-dim); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* MAIN LAYOUT */
+  .main { padding: 20px 24px; max-width: 1600px; }
+
+  /* PANEL SYSTEM */
+  .panel-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 14px; }
+  .panel-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
+  .panel-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .panel-grid-21 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .panel-grid-12 { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; margin-bottom: 14px; }
+  .panel-full { margin-bottom: 14px; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  }
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--border);
+  }
+  .panel.accent::before { background: var(--accent); }
+  .panel.blue::before { background: var(--accent2); }
+  .panel.green::before { background: var(--accent3); }
+  .panel.danger::before { background: var(--danger); }
+  .panel.warn::before { background: var(--warn); }
+
+  .panel-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-title .aemp-tag {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    background: var(--surface2);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    letter-spacing: 0.5px;
+  }
+
+  /* KPI CARDS */
+  .kpi-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 36px;
+    line-height: 1;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .kpi-value.accent { color: var(--accent); }
+  .kpi-value.green { color: var(--accent3); }
+  .kpi-value.blue { color: var(--accent2); }
+  .kpi-value.danger { color: var(--danger); }
+  .kpi-value.warn { color: var(--warn); }
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .kpi-delta {
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .kpi-delta.up { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .kpi-delta.down { background: rgba(16,185,129,0.15); color: var(--accent3); }
+  .kpi-delta.neutral { background: rgba(100,116,139,0.2); color: var(--text-muted); }
+
+  /* AEMP GAUGE */
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; padding: 8px 0; }
+  .gauge-canvas { width: 120px; height: 70px; }
+  .gauge-value { font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:28px; color:var(--text); margin-top:2px; }
+  .gauge-label { font-size:10px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; text-align:center; }
+  .gauge-target { font-size:10px; color:var(--text-muted); margin-top:2px; }
+
+  /* CHART CONTAINERS */
+  .chart-wrap { position: relative; }
+  canvas { display: block; }
+
+  /* DATA TABLE */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table th {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+  }
+  .data-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(42,51,71,0.5);
+    color: var(--text-dim);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+  }
+  .data-table tr:hover td { background: var(--bg); }
+  .data-table .equip-name { color: var(--text); font-family: 'Barlow',sans-serif; font-weight:500; }
+  .data-table .cost { color: var(--accent); }
+  .data-table .flag-red { color: var(--danger); }
+  .data-table .flag-yellow { color: var(--warn); }
+  .data-table .flag-green { color: var(--accent3); }
+
+  /* PROGRESS BARS */
+  .progress-row { margin-bottom: 8px; }
+  .progress-label {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 3px;
+    font-size: 11px; color: var(--text-dim);
+  }
+  .progress-label .val { font-family: 'IBM Plex Mono', monospace; color: var(--text); }
+  .progress-track {
+    height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; border-radius: 3px;
+    transition: width 1s ease;
+  }
+
+  /* REPLACEMENT TABLE */
+  .rep-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: 'Barlow Condensed', sans-serif;
+    letter-spacing: 0.5px;
+  }
+  .rep-badge.critical { background: rgba(239,68,68,0.2); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+  .rep-badge.monitor { background: rgba(249,115,22,0.2); color: var(--warn); border: 1px solid rgba(249,115,22,0.3); }
+  .rep-badge.optimal { background: rgba(16,185,129,0.2); color: var(--accent3); border: 1px solid rgba(16,185,129,0.3); }
+
+  /* COST CODE SECTION */
+  .cost-code-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+  .cost-code-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+  }
+  .cost-code-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    margin-bottom: 2px;
+  }
+  .cost-code-label { font-size: 11px; color: var(--text-dim); margin-bottom: 6px; }
+  .cost-code-amount {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--text);
+  }
+
+  /* SECTION DIVIDER */
+  .section-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-label::before {
+    content: ''; width: 4px; height: 14px;
+    background: var(--accent); border-radius: 2px; flex-shrink: 0;
+  }
+
+  /* VIEWS */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ALERT BANNER */
+  .alert-banner {
+    background: rgba(234,88,12,0.06);
+    border: 1px solid rgba(234,88,12,0.25);
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px; color: var(--text-dim);
+  }
+  .alert-icon { color: var(--warn); font-size: 16px; flex-shrink: 0; }
+
+  /* TELEMATICS STATUS */
+  .telem-status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .status-dot.pending { background: var(--warn); animation: pulse 2s infinite; }
+  .status-dot.connected { background: var(--accent3); }
+
+  /* FLEET COMPOSITION PIE LEGEND */
+  .legend-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px; font-size: 11px; color: var(--text-dim);
+  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .legend-val { font-family: 'IBM Plex Mono', monospace; margin-left: auto; color: var(--text); }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  /* TCO CURVE */
+  .tco-annotation {
+    position: absolute;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--accent);
+    pointer-events: none;
+  }
+
+  /* FLEET MANAGER */
+  .fm-input-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
+  .fm-field { display: flex; flex-direction: column; gap: 4px; }
+  .fm-field label { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .fm-input {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    padding: 7px 10px; outline: none; transition: border-color 0.2s;
+  }
+  .fm-input:focus { border-color: var(--accent); }
+  .fm-input::placeholder { color: var(--text-muted); }
+  .fm-btn {
+    padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px;
+    letter-spacing: 0.5px; transition: all 0.15s;
+  }
+  .fm-btn.primary { background: var(--accent); color: #000; }
+  .fm-btn.primary:hover { background: #fbbf24; }
+  .fm-btn.danger { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+  .fm-btn.danger:hover { background: rgba(239,68,68,0.25); }
+  .fm-btn.ghost { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+  .fm-btn.ghost:hover { border-color: var(--accent2); color: var(--text); }
+  .sold-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 4px; background: var(--surface2); margin-bottom: 6px; }
+  .sold-row .sold-id { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; color: var(--text); width: 44px; }
+  .sold-row .sold-name { flex: 1; font-size: 12px; color: var(--text-dim); }
+  .sold-row .sold-date { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--warn); background: rgba(249,115,22,0.1); padding: 2px 7px; border-radius: 2px; }
+  .sold-row .sold-cls { font-size: 10px; color: var(--text-muted); width: 100px; }
+  .sold-row .sold-rm { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-muted); width: 70px; text-align: right; }
+  .sold-row .remove-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 3px; }
+  .sold-row .remove-btn:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
+  .fm-stats { display: flex; gap: 16px; margin-bottom: 16px; }
+  .fm-stat { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 10px 14px; }
+  .fm-stat-val { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 24px; color: var(--text); }
+  .fm-stat-lbl { font-size: 10px; color: var(--text-muted); font-family: 'IBM Plex Mono', monospace; }
+  .filter-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(249,115,22,0.12); border: 1px solid rgba(249,115,22,0.3);
+    color: var(--warn); font-size: 10px; font-family: 'IBM Plex Mono', monospace;
+    padding: 3px 8px; border-radius: 3px; margin-left: 8px;
+  }
+  .search-box { display: flex; gap: 8px; margin-bottom: 12px; }
+  .sold-list-wrap { max-height: 380px; overflow-y: auto; }
+
+  .data-disclaimer {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    text-align: right;
+    padding: 8px 0 4px;
+    border-top: 1px solid var(--border);
+    margin-top: 16px;
+  }
+  /* FLEET MANAGER */
+  .fm-input-row { display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px; }
+  .fm-field { display:flex;flex-direction:column;gap:4px; }
+  .fm-field label { font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px; }
+  .fm-input { background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 10px;outline:none;transition:border-color 0.2s; }
+  .fm-input:focus { border-color:var(--accent); }
+  .fm-input::placeholder { color:var(--text-muted); }
+  .fm-btn { padding:8px 14px;border-radius:4px;border:none;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.5px;transition:all 0.15s; }
+  .fm-btn.primary { background:var(--accent);color:#fff; }
+  .fm-btn.primary:hover { background:#b45309; }
+  .fm-btn.danger { background:rgba(220,38,38,0.1);color:var(--danger);border:1px solid rgba(220,38,38,0.3); }
+  .fm-btn.danger:hover { background:rgba(220,38,38,0.2); }
+  .fm-btn.ghost { background:var(--surface2);color:var(--text-dim);border:1px solid var(--border); }
+  .fm-btn.ghost:hover { border-color:var(--accent2);color:var(--text); }
+  .sold-row { display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:4px;background:var(--bg);margin-bottom:6px;border:1px solid var(--border); }
+  .sold-row:hover { border-color:var(--accent); }
+  .sold-row .sold-id { font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:var(--text);width:44px;flex-shrink:0; }
+  .sold-row .sold-name { flex:1;font-size:12px;color:var(--text-dim); }
+  .sold-row .sold-date { font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--warn);background:rgba(249,115,22,0.1);padding:2px 7px;border-radius:2px;flex-shrink:0; }
+  .sold-row .sold-cls { font-size:10px;color:var(--text-muted);width:110px;flex-shrink:0; }
+  .sold-row .sold-rm { font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-muted);width:72px;text-align:right;flex-shrink:0; }
+  .sold-row .sold-price { font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent3);width:72px;text-align:right;flex-shrink:0; }
+  .sold-row .remove-btn { background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:3px;flex-shrink:0; }
+  .sold-row .remove-btn:hover { color:var(--danger);background:rgba(239,68,68,0.12); }
+  .fm-stats { display:flex;gap:12px;flex-wrap:wrap; }
+  .fm-stat { background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 14px; }
+  .fm-stat-val { font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:24px;color:var(--text); }
+  .fm-stat-lbl { font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace; }
+  .filter-badge { display:inline-flex;align-items:center;gap:5px;background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.3);color:var(--warn);font-size:10px;font-family:'IBM Plex Mono',monospace;padding:3px 8px;border-radius:3px;margin-left:8px; }
+  .search-box { display:flex;gap:8px;margin-bottom:12px; }
+  .sold-list-wrap { max-height:360px;overflow-y:auto; }
+  .roster-disposed td { opacity:0.45; }
+  .roster-disposed .action-cell { opacity:1; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">FLEET<span>OPS</span></div>
+    <div class="header-badge">AEMP / ISO 15143-3</div>
+    <div class="header-badge">178 UNITS</div>
+    <div class="header-badge">2021–2025</div>
+  </div>
+  <div class="header-right">
+    <div class="telem-status" id="telem-status-visionlink">
+      <div class="status-dot pending" id="vl-status-dot"></div>
+      <span id="vl-status-text">VisionLink: Not Connected</span>
+    </div>
+    <button class="fm-btn ghost" onclick="showView('telematics')" style="margin-left:12px;padding:4px 10px;font-size:11px;">⚙ API Settings</button>
+    <div class="live-dot" style="margin-left:16px;" id="header-data-mode">STATIC DATA · 2021-2025</div>
+  </div>
+</div>
+
+<div class="nav-tabs">
+  <div class="tab active" onclick="showView('overview')">Overview</div>
+  <div class="tab" onclick="showView('rm_analysis')">R&M Analysis</div>
+  <div class="tab" onclick="showView('fleet_classes')">Fleet Classes</div>
+  <div class="tab" onclick="showView('replacement')">Replacement Optimizer</div>
+  <div class="tab" onclick="showView('aemp_kpis')">AEMP KPIs</div>
+  <div class="tab" onclick="showView('cost_codes')">AEMP Cost Codes</div>
+  <div class="tab" onclick="showView('fleet_manager')" id="tab-fleet-manager">⚙ Fleet Manager</div>
+  <div class="tab" onclick="showView('telematics')" id="tab-telematics">📡 Live Telematics</div>
+</div>
+
+<div class="main">
+
+<!-- ===================== OVERVIEW ===================== -->
+<div class="view active" id="view-overview">
+
+  <div class="alert-banner" style="background:rgba(37,99,235,0.06);border-color:rgba(37,99,235,0.25);">
+    <div class="alert-icon" style="color:var(--accent2);">📋</div>
+    <div><strong style="color:var(--accent2)">Purchase Data Loaded (AEMP Code 700):</strong> 76 of 82 active heavy equipment units have purchase price data. <strong style="color:var(--warn)">6 units are missing purchase price</strong> — flagged below in Fleet Manager. Depreciation calculated using straight-line method with class-based useful lives (12–15 years, 10% residual value).</div>
+  </div>
+
+  <!-- Ownership Cost KPI Row -->
+  <div class="panel-grid-4" style="margin-bottom:14px;">
+    <div class="panel blue">
+      <div class="panel-title">Original Fleet Cost <span class="aemp-tag">AEMP 700</span></div>
+      <div class="kpi-value blue">$13.9M</div>
+      <div class="kpi-sub">76 heavy units w/ purchase data</div>
+    </div>
+    <div class="panel green">
+      <div class="panel-title">Est. Book Value Today <span class="aemp-tag">STRAIGHT-LINE</span></div>
+      <div class="kpi-value green">$8.5M</div>
+      <div class="kpi-sub">After accumulated depreciation</div>
+    </div>
+    <div class="panel accent">
+      <div class="panel-title">Annual Depreciation <span class="aemp-tag">AEMP 700</span></div>
+      <div class="kpi-value accent">$977K</div>
+      <div class="kpi-sub">Ownership cost per year</div>
+    </div>
+    <div class="panel warn">
+      <div class="panel-title">Missing Purchase Price <span class="aemp-tag">DATA GAP</span></div>
+      <div class="kpi-value warn">6</div>
+      <div class="kpi-sub">Active heavy units — see Fleet Manager</div>
+    </div>
+  </div>
+  <div class="panel-grid-4">
+    <div class="panel accent">
+      <div class="panel-title">Total Fleet R&M (2025) <span class="aemp-tag">AEMP CODE 200+100</span></div>
+      <div class="kpi-value accent">$1.19M</div>
+      <div class="kpi-sub">Full-Year 2025 <span class="kpi-delta up">▲ +57% vs 2024</span></div>
+    </div>
+    <div class="panel blue">
+      <div class="panel-title">Repair vs PM Split (2024) <span class="aemp-tag">AEMP PMR</span></div>
+      <div class="kpi-value blue">58/42</div>
+      <div class="kpi-sub">Repair / PM% &nbsp;<span class="kpi-delta up">Below 70% target</span></div>
+    </div>
+    <div class="panel green">
+      <div class="panel-title">5-Yr Fleet R&M (2021-2025) <span class="aemp-tag">CUMULATIVE</span></div>
+      <div class="kpi-value green">$3.56M</div>
+      <div class="kpi-sub">Excl. Pre-2021 baseline</div>
+    </div>
+    <div class="panel warn">
+      <div class="panel-title">Units Exceeding $30K/Yr <span class="aemp-tag">R&M INTENSITY</span></div>
+      <div class="kpi-value warn">7</div>
+      <div class="kpi-sub">2024 fleet · Economic life review</div>
+    </div>
+  </div>
+
+  <!-- Trend + Composition -->
+  <div class="panel-grid-21">
+    <div class="panel blue">
+      <div class="panel-title">Annual R&M Expenditure by Fleet Class <span class="aemp-tag">2021–2025</span></div>
+      <div class="chart-wrap" style="height:260px;">
+        <canvas id="chart-trend"></canvas>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Fleet Composition <span class="aemp-tag">64 UNITS</span></div>
+      <div style="display:flex; flex-direction:column; align-items:center; padding-top:8px;">
+        <div class="chart-wrap" style="height:160px; width:160px;">
+          <canvas id="chart-fleet-pie"></canvas>
+        </div>
+        <div style="width:100%; margin-top:12px; padding: 0 4px;">
+          <div class="legend-row"><div class="legend-dot" style="background:var(--excavator)"></div>Excavators<div class="legend-val">18 units</div></div>
+          <div class="legend-row"><div class="legend-dot" style="background:var(--dozer)"></div>Dozers<div class="legend-val">12 units</div></div>
+          <div class="legend-row"><div class="legend-dot" style="background:var(--truck)"></div>Art. Trucks<div class="legend-val">9 units</div></div>
+          <div class="legend-row"><div class="legend-dot" style="background:var(--roller)"></div>Rollers<div class="legend-val">8 units</div></div>
+          <div class="legend-row"><div class="legend-dot" style="background:var(--loader)"></div>Loaders<div class="legend-val">7 units</div></div>
+          <div class="legend-row"><div class="legend-dot" style="background:var(--support)"></div>Support<div class="legend-val">10 units</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top R&M units 2024 + PM Ratio -->
+  <div class="panel-grid-21">
+    <div class="panel accent">
+      <div class="panel-title">Top 10 R&M Cost Units — 2024 <span class="aemp-tag">REPAIR INTENSITY</span></div>
+      <table class="data-table">
+        <tr>
+          <th>Unit</th><th>Model</th><th>Class</th><th>Age</th>
+          <th>Total R&M</th><th>PM%</th><th>Signal</th>
+        </tr>
+        <tbody id="top10-tbody"></tbody>
+      </table>
+    </div>
+    <div class="panel green">
+      <div class="panel-title">Planned Maintenance Ratio by Class <span class="aemp-tag">AEMP PMR TARGET 70%</span></div>
+      <div style="padding: 8px 0;" id="pm-bars"></div>
+      <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border);">
+        <div style="font-size:10px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; margin-bottom:6px;">AEMP PLANNED MAINTENANCE RATIO BENCHMARK</div>
+        <div style="font-size:11px; color:var(--text-dim);">AEMP best practice: <strong style="color:var(--accent3)">≥70% planned</strong> of all maintenance activity. Higher PMR = proactive culture, lower unplanned downtime costs.</div>
+        <div style="margin-top:8px; font-size:11px; color:var(--text-dim);">Average fleet PMR (2022–2024): <strong style="color:var(--warn)">~55%</strong> — <em>below target across most classes.</em></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Age cohort bar -->
+  <div class="panel-grid-2">
+    <div class="panel warn">
+      <div class="panel-title">R&M Cost Intensity by Age Cohort (2024 avg/unit) <span class="aemp-tag">ECONOMIC LIFE</span></div>
+      <div class="chart-wrap" style="height:180px;">
+        <canvas id="chart-cohort"></canvas>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Year-Over-Year R&M Trend <span class="aemp-tag">FLEET TOTAL</span></div>
+      <div class="chart-wrap" style="height:180px;">
+        <canvas id="chart-yoy"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== R&M ANALYSIS ===================== -->
+<div class="view" id="view-rm_analysis">
+
+  <div class="section-label">Repair & Maintenance Cost Analysis — All Units</div>
+
+  <div class="panel-grid-4">
+    <div class="panel">
+      <div class="panel-title">2021 Total R&M</div>
+      <div class="kpi-value">$288K</div>
+      <div class="kpi-sub">9-month partial year</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">2022 Total R&M</div>
+      <div class="kpi-value accent">$539K</div>
+      <div class="kpi-sub"><span class="kpi-delta up">▲ +87%</span> vs 2021</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">2023 Total R&M</div>
+      <div class="kpi-value warn">$784K</div>
+      <div class="kpi-sub"><span class="kpi-delta up">▲ +46%</span> vs 2022</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">2024 Total R&M</div>
+      <div class="kpi-value green">$760K</div>
+      <div class="kpi-sub"><span class="kpi-delta down">▼ -3%</span> vs 2023 ✓</div>
+    </div>
+  </div>
+
+  <div class="panel-grid-21">
+    <div class="panel blue">
+      <div class="panel-title">Repair vs. Routine Maintenance — Annual Split <span class="aemp-tag">CODE 100 vs 200</span></div>
+      <div class="chart-wrap" style="height:240px;">
+        <canvas id="chart-split-bar"></canvas>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">R&M Cost Intensity — Top 15 Units (Cumulative 2021–2025)</div>
+      <div style="max-height:280px; overflow-y:auto;">
+        <table class="data-table">
+          <tr><th>Unit</th><th>Model</th><th>5-Yr Total</th><th>Avg/Yr</th></tr>
+          <tbody id="cumulative-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-full panel">
+    <div class="panel-title">Repair vs. PM Ratio — All Units 2024 <span class="aemp-tag">AEMP PLANNED MAINTENANCE RATIO</span></div>
+    <div class="chart-wrap" style="height:220px;">
+      <canvas id="chart-pm-scatter"></canvas>
+    </div>
+    <div style="margin-top:8px; font-size:11px; color:var(--text-dim);">
+      Each bar = one unit. Orange fill = repair cost. Green fill = PM cost. Red dashed line = AEMP 70% planned maintenance ratio target.
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== FLEET CLASSES ===================== -->
+<div class="view" id="view-fleet_classes">
+  <div class="section-label">Fleet Class Deep-Dive — R&M by Category</div>
+
+  <div class="panel-grid-3">
+    <div class="panel accent">
+      <div class="panel-title">Excavators (18 units)</div>
+      <div class="kpi-value">$228K</div>
+      <div class="kpi-sub">2024 total · Avg $12.7K/unit</div>
+      <div style="margin-top:10px;">
+        <div class="progress-row">
+          <div class="progress-label"><span>Repair %</span><span class="val">~57%</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:57%; background:var(--danger)"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label"><span>PM %</span><span class="val">~43%</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:43%; background:var(--accent3)"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="--panel-accent:var(--dozer)">
+      <div class="panel-title">Dozers (12 units)</div>
+      <div class="kpi-value" style="color:var(--dozer)">$159K</div>
+      <div class="kpi-sub">2024 total · Avg $13.3K/unit</div>
+      <div style="margin-top:10px;">
+        <div class="progress-row">
+          <div class="progress-label"><span>Repair %</span><span class="val">~34%</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:34%; background:var(--danger)"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label"><span>PM %</span><span class="val">~66%</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:66%; background:var(--accent3)"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Articulated Trucks (9 units)</div>
+      <div class="kpi-value" style="color:var(--truck)">$225K</div>
+      <div class="kpi-sub">2024 total · Avg $25.0K/unit</div>
+      <div style="margin-top:10px;">
+        <div class="progress-row">
+          <div class="progress-label"><span>Repair %</span><span class="val">~51%</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:51%; background:var(--danger)"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label"><span>PM %</span><span class="val">~49%</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:49%; background:var(--accent3)"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-full panel blue">
+    <div class="panel-title">Fleet Class Spend Trend 2021–2025 (Stacked) <span class="aemp-tag">FULL FLEET</span></div>
+    <div class="chart-wrap" style="height:260px;">
+      <canvas id="chart-stacked-class"></canvas>
+    </div>
+  </div>
+
+  <div class="panel-grid-2">
+    <div class="panel warn">
+      <div class="panel-title">Dozer Fleet Age Profile <span class="aemp-tag">ECONOMIC LIFE RISK</span></div>
+      <div style="padding: 8px 0;">
+        <div class="progress-row">
+          <div class="progress-label"><span>CAT D5G LGP 201 (2004 · 21yr)</span><span class="val flag-red">CRITICAL</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:100%; background:var(--danger)"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label"><span>CAT D5G LGP 202 (2005 · 20yr)</span><span class="val flag-red">CRITICAL</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:100%; background:var(--danger)"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label"><span>CAT D6T XW 206 (2012 · 13yr)</span><span class="val flag-yellow">WATCH</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:75%; background:var(--warn)"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label"><span>CAT D6T XW 209 (2014 · 11yr)</span><span class="val flag-yellow">WATCH</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:62%; background:var(--warn)"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label"><span>CAT D6N XL 210 (2019 · 6yr)</span><span class="val flag-green">OK</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:30%; background:var(--accent3)"></div></div>
+        </div>
+      </div>
+      <div style="font-size:10px; color:var(--text-muted); margin-top:8px;">AEMP guidance: heavy dozer economic life = 10–14 yrs / 10,000–16,000 hrs</div>
+    </div>
+    <div class="panel warn">
+      <div class="panel-title">Articulated Truck Age Profile <span class="aemp-tag">ECONOMIC LIFE RISK</span></div>
+      <div style="padding: 8px 0;">
+        <div class="progress-row">
+          <div class="progress-label"><span>CAT 725 Water 501 (2004 · 21yr)</span><span class="val flag-red">CRITICAL</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:100%; background:var(--danger)"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label"><span>CAT 725C 502 (2015 · 10yr)</span><span class="val flag-yellow">MONITOR</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:55%; background:var(--warn)"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label"><span>CAT 725C 503 (2015 · 10yr)</span><span class="val flag-yellow">MONITOR</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:55%; background:var(--warn)"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label"><span>CAT 725C 504 (2015 · 10yr)</span><span class="val flag-yellow">MONITOR</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:55%; background:var(--warn)"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label"><span>CAT 745C 505/506/508 (2015-16 · 9-10yr)</span><span class="val flag-yellow">MONITOR</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:50%; background:var(--warn)"></div></div>
+        </div>
+      </div>
+      <div style="font-size:10px; color:var(--text-muted); margin-top:8px;">AEMP guidance: articulated truck economic life = 8–12 yrs / 12,000–18,000 hrs</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== REPLACEMENT OPTIMIZER ===================== -->
+<div class="view" id="view-replacement">
+  <div class="section-label">Economic Life & Replacement Timing Optimizer</div>
+
+  <div class="alert-banner">
+    <div class="alert-icon">ℹ</div>
+    <div>Replacement timing is modeled using cumulative R&M cost trajectory, age vs. industry economic life benchmarks (AEMP/AED), and repair-to-PM ratio deterioration. Total Cost of Ownership (TCO) curves require telematics hours data for full lifecycle cost-per-hour calculation — these will auto-populate once VisionLink/Trimble APIs are connected.</div>
+  </div>
+
+  <div class="panel-grid-4">
+    <div class="panel danger">
+      <div class="panel-title">Critical — Replace Now</div>
+      <div class="kpi-value danger">5</div>
+      <div class="kpi-sub">Units beyond economic life</div>
+    </div>
+    <div class="panel warn">
+      <div class="panel-title">Monitor — 1-2 Year Window</div>
+      <div class="kpi-value warn">11</div>
+      <div class="kpi-sub">Units approaching end of life</div>
+    </div>
+    <div class="panel green">
+      <div class="panel-title">Optimal — Hold</div>
+      <div class="kpi-value green">48</div>
+      <div class="kpi-sub">Within productive life cycle</div>
+    </div>
+    <div class="panel blue">
+      <div class="panel-title">Est. Capital Required</div>
+      <div class="kpi-value blue">$3.2M+</div>
+      <div class="kpi-sub">Critical replacements (rough est.)</div>
+    </div>
+  </div>
+
+  <div class="panel-full panel">
+    <div class="panel-title">Replacement Priority Matrix — Priority Units <span class="aemp-tag">AEMP ECONOMIC LIFE MODEL</span></div>
+    <table class="data-table">
+      <tr>
+        <th>Unit</th><th>Model</th><th>Model Yr</th><th>Age</th><th>Class</th>
+        <th>5-Yr Cum R&M</th><th>Avg $/Yr</th><th>Economic Life</th><th>R&M Trend</th><th>Status</th>
+      </tr>
+      <tbody id="replacement-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="panel-grid-2">
+    <div class="panel blue">
+      <div class="panel-title">Conceptual TCO Curve — Excavator Class <span class="aemp-tag">ILLUSTRATIVE</span></div>
+      <div class="chart-wrap" style="height:200px;">
+        <canvas id="chart-tco"></canvas>
+      </div>
+      <div style="font-size:10px; color:var(--text-muted); margin-top:6px;">TCO = Ownership costs (depreciation, insurance, financing) + O&O costs (fuel, lubrication, R&M). Minimum TCO/hr = optimal replacement point. Full curve requires hourly operating data from telematics.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">R&M Cost Escalation — High-Priority Units <span class="aemp-tag">2021–2025</span></div>
+      <div class="chart-wrap" style="height:200px;">
+        <canvas id="chart-escalation"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== AEMP KPIs ===================== -->
+<div class="view" id="view-aemp_kpis">
+  <div class="section-label">AEMP Key Performance Indicators</div>
+
+  <div class="alert-banner">
+    <div class="alert-icon">ℹ</div>
+    <div><strong style="color:var(--accent2)">Data Status:</strong> Availability and utilization KPIs require telematics hours (scheduled, available, operating). Currently showing R&M-derived KPIs. Once VisionLink/Trimble connected, full AEMP KPI suite will populate including Physical Availability, Use Availability, Utilization Rate, and MTBF by system.</div>
+  </div>
+
+  <div class="panel-grid-3">
+    <div class="panel">
+      <div class="panel-title">Physical Availability <span class="aemp-tag">TARGET ≥85%</span></div>
+      <div class="gauge-wrap">
+        <canvas class="gauge-canvas" id="gauge-pa"></canvas>
+        <div class="gauge-value">—</div>
+        <div class="gauge-label">Requires telematics hours</div>
+      </div>
+      <div style="margin-top:8px; font-size:10px; color:var(--text-muted);">PA = (Scheduled Hrs − Downtime Hrs) / Scheduled Hrs × 100. AEMP target: ≥85%</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Use Availability <span class="aemp-tag">TARGET ≥75%</span></div>
+      <div class="gauge-wrap">
+        <div class="gauge-value" style="margin-top:20px;">—</div>
+        <div class="gauge-label">Requires telematics hours</div>
+      </div>
+      <div style="margin-top:8px; font-size:10px; color:var(--text-muted);">UA = Operating Hrs / Available Hrs × 100. Indicates how well available assets are utilized.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Utilization Rate <span class="aemp-tag">TARGET ≥60%</span></div>
+      <div class="gauge-wrap">
+        <div class="gauge-value" style="margin-top:20px;">—</div>
+        <div class="gauge-label">Requires telematics hours</div>
+      </div>
+      <div style="margin-top:8px; font-size:10px; color:var(--text-muted);">UR = Operating Hrs / Scheduled Hrs × 100. Combined availability + use metric.</div>
+    </div>
+  </div>
+
+  <div class="panel-grid-2">
+    <div class="panel green">
+      <div class="panel-title">Planned Maintenance Ratio — Fleet (2022–2024 avg) <span class="aemp-tag">AEMP TARGET ≥70%</span></div>
+      <div class="chart-wrap" style="height:200px;">
+        <canvas id="chart-pmr"></canvas>
+      </div>
+      <div style="margin-top:8px; font-size:10px; color:var(--text-muted);">PMR = PM Cost / Total R&M Cost × 100. Based on AEMP Code 100 (Routine Maintenance) vs Code 200 (Major Repairs).</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">AEMP KPI Benchmarking — Current Data-Available Metrics</div>
+      <table class="data-table">
+        <tr><th>KPI</th><th>Definition</th><th>Target</th><th>Actual</th><th>Status</th></tr>
+        <tr>
+          <td class="equip-name">Fleet R&M $/Unit</td>
+          <td>Avg annual R&M cost per unit</td>
+          <td style="color:var(--text-muted)">Industry varies</td>
+          <td class="cost">$11.9K</td>
+          <td><span class="rep-badge optimal">TRACKED</span></td>
+        </tr>
+        <tr>
+          <td class="equip-name">PM Ratio (PMR)</td>
+          <td>Planned % of total R&M</td>
+          <td style="color:var(--accent3)">≥70%</td>
+          <td class="flag-yellow">~55%</td>
+          <td><span class="rep-badge monitor">BELOW</span></td>
+        </tr>
+        <tr>
+          <td class="equip-name">Physical Avail.</td>
+          <td>Uptime / Scheduled time</td>
+          <td style="color:var(--accent3)">≥85%</td>
+          <td class="flag-yellow">Pending</td>
+          <td><span class="rep-badge monitor">API REQ'D</span></td>
+        </tr>
+        <tr>
+          <td class="equip-name">Use Avail.</td>
+          <td>Operating / Available hrs</td>
+          <td style="color:var(--accent3)">≥75%</td>
+          <td class="flag-yellow">Pending</td>
+          <td><span class="rep-badge monitor">API REQ'D</span></td>
+        </tr>
+        <tr>
+          <td class="equip-name">Utilization Rate</td>
+          <td>Operating / Scheduled hrs</td>
+          <td style="color:var(--accent3)">≥60%</td>
+          <td class="flag-yellow">Pending</td>
+          <td><span class="rep-badge monitor">API REQ'D</span></td>
+        </tr>
+        <tr>
+          <td class="equip-name">MTBF</td>
+          <td>Mean time between failures</td>
+          <td style="color:var(--text-muted)">Maximize</td>
+          <td class="flag-yellow">Pending</td>
+          <td><span class="rep-badge monitor">API REQ'D</span></td>
+        </tr>
+        <tr>
+          <td class="equip-name">Economic Life</td>
+          <td>Age vs. R&M cost curve</td>
+          <td style="color:var(--text-muted)">Min TCO/hr</td>
+          <td class="flag-red">5 critical</td>
+          <td><span class="rep-badge critical">ACTION</span></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel-full panel blue">
+    <div class="panel-title">MTBF & Downtime by System — Framework (Telematics Required)</div>
+    <div style="padding: 16px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+      <div class="cost-code-card">
+        <div class="cost-code-num">SYSTEM</div>
+        <div class="cost-code-label">Powertrain / Engine</div>
+        <div class="cost-code-amount" style="color:var(--text-muted);">MTBF: —</div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">Requires fault code data from VisionLink</div>
+      </div>
+      <div class="cost-code-card">
+        <div class="cost-code-num">SYSTEM</div>
+        <div class="cost-code-label">Hydraulics</div>
+        <div class="cost-code-amount" style="color:var(--text-muted);">MTBF: —</div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">Requires fault code data from VisionLink</div>
+      </div>
+      <div class="cost-code-card">
+        <div class="cost-code-num">SYSTEM</div>
+        <div class="cost-code-label">Undercarriage / Drive</div>
+        <div class="cost-code-amount" style="color:var(--text-muted);">MTBF: —</div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">High historical cost driver in dozers</div>
+      </div>
+      <div class="cost-code-card">
+        <div class="cost-code-num">SYSTEM</div>
+        <div class="cost-code-label">Electrical / Controls</div>
+        <div class="cost-code-amount" style="color:var(--text-muted);">MTBF: —</div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">Requires fault code data from Trimble</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== COST CODES ===================== -->
+<div class="view" id="view-cost_codes">
+  <div class="section-label">AEMP Standard Cost Code Mapping</div>
+
+  <div class="panel-grid-2">
+    <div class="panel accent">
+      <div class="panel-title">AEMP Cost Code Mapping — Your Data <span class="aemp-tag">MAPPED</span></div>
+      <div class="cost-code-grid">
+        <div class="cost-code-card">
+          <div class="cost-code-num">AEMP 100</div>
+          <div class="cost-code-label">Routine Maintenance (PM)</div>
+          <div class="cost-code-amount">$684K</div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">2021–2024 cumulative</div>
+        </div>
+        <div class="cost-code-card">
+          <div class="cost-code-num">AEMP 200</div>
+          <div class="cost-code-label">Major Repairs</div>
+          <div class="cost-code-amount">$1.35M</div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">2021–2024 cumulative</div>
+        </div>
+        <div class="cost-code-card">
+          <div class="cost-code-num">AEMP 300</div>
+          <div class="cost-code-label">Tires / Undercarriage</div>
+          <div class="cost-code-amount" style="color:var(--text-muted);">Pending</div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">Not separated in source data</div>
+        </div>
+        <div class="cost-code-card">
+          <div class="cost-code-num">AEMP 400</div>
+          <div class="cost-code-label">Ground Engaging Tools</div>
+          <div class="cost-code-amount" style="color:var(--text-muted);">Pending</div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">Not separated in source data</div>
+        </div>
+        <div class="cost-code-card">
+          <div class="cost-code-num">AEMP 500</div>
+          <div class="cost-code-label">Fuel &amp; Lubrication</div>
+          <div class="cost-code-amount" style="color:var(--text-muted);">Pending</div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">Telematics / fuel data req'd</div>
+        </div>
+        <div class="cost-code-card">
+          <div class="cost-code-num">TELEMATICS</div>
+          <div class="cost-code-label">Trimble GPS (Code 900)</div>
+          <div class="cost-code-amount">$10.2K</div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">2021–2025 tracked separately</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel blue">
+      <div class="panel-title">AEMP Cost Code Spend Share — 2024</div>
+      <div class="chart-wrap" style="height:240px; padding-top:20px;">
+        <canvas id="chart-cost-code-pie"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-full panel">
+    <div class="panel-title">Data Gaps — Additional AEMP Cost Codes to Capture</div>
+    <table class="data-table">
+      <tr><th>AEMP Code</th><th>Category</th><th>Data Source Needed</th><th>Business Value</th><th>Priority</th></tr>
+      <tr>
+        <td class="equip-name">AEMP 300</td><td>Tires / Undercarriage / Tracks</td>
+        <td>Separate PO line in QuickBooks</td>
+        <td>High — often 20-35% of dozer/excavator R&M</td>
+        <td><span class="rep-badge critical">HIGH</span></td>
+      </tr>
+      <tr>
+        <td class="equip-name">AEMP 400</td><td>Ground Engaging Tools (GET)</td>
+        <td>Separate PO line in QuickBooks</td>
+        <td>Medium — bucket teeth, cutting edges</td>
+        <td><span class="rep-badge monitor">MEDIUM</span></td>
+      </tr>
+      <tr>
+        <td class="equip-name">AEMP 500</td><td>Fuel Consumption</td>
+        <td>Fuel cards + VisionLink telematics</td>
+        <td>Critical — largest O&O cost driver (35-45% of TCO)</td>
+        <td><span class="rep-badge critical">HIGH</span></td>
+      </tr>
+      <tr>
+        <td class="equip-name">AEMP 600</td><td>Operator / Labor</td>
+        <td>Payroll system</td>
+        <td>Full TCO model requires loaded labor rates</td>
+        <td><span class="rep-badge monitor">MEDIUM</span></td>
+      </tr>
+      <tr>
+        <td class="equip-name">AEMP 700</td><td>Ownership / Depreciation</td>
+        <td>Fixed assets register + purchase records</td>
+        <td>Required for cost-per-hour and replacement decisions</td>
+        <td><span class="rep-badge critical">HIGH</span></td>
+      </tr>
+      <tr>
+        <td class="equip-name">AEMP 800</td><td>Telematics / Technology</td>
+        <td>VisionLink + Trimble invoices</td>
+        <td>Partially captured (Trimble line item visible)</td>
+        <td><span class="rep-badge optimal">LOW</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="panel-grid-2">
+    <div class="panel green">
+      <div class="panel-title">Data Enhancement Roadmap — Priority Actions</div>
+      <div style="padding:8px 0;">
+        <div style="display:flex; gap:10px; margin-bottom:12px; align-items:flex-start;">
+          <div style="width:24px; height:24px; border-radius:50%; background:var(--danger); display:flex; align-items:center; justify-content:center; font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:12px; flex-shrink:0;">1</div>
+          <div>
+            <div style="font-weight:600; color:var(--text); font-size:12px;">Receive & Wire Telematics APIs</div>
+            <div style="font-size:11px; color:var(--text-muted);">VisionLink (Cat) + Trimble credentials → enables ISO 15143-3 data feed for hours, utilization, fault codes, physical availability</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom:12px; align-items:flex-start;">
+          <div style="width:24px; height:24px; border-radius:50%; background:var(--warn); display:flex; align-items:center; justify-content:center; font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:12px; flex-shrink:0;">2</div>
+          <div>
+            <div style="font-weight:600; color:var(--text); font-size:12px;">Separate Tires/Undercarriage from R&M</div>
+            <div style="font-size:11px; color:var(--text-muted);">Map QuickBooks PO codes to AEMP 300 — critical for accurate dozer and excavator TCO</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom:12px; align-items:flex-start;">
+          <div style="width:24px; height:24px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:12px; flex-shrink:0;">3</div>
+          <div>
+            <div style="font-weight:600; color:var(--text); font-size:12px;">Add Fuel Card Data (AEMP 500)</div>
+            <div style="font-size:11px; color:var(--text-muted);">Integrate fuel card provider API → fuel is 35–45% of TCO, largest data gap currently</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:flex-start;">
+          <div style="width:24px; height:24px; border-radius:50%; background:var(--accent2); display:flex; align-items:center; justify-content:center; font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:12px; flex-shrink:0;">4</div>
+          <div>
+            <div style="font-weight:600; color:var(--text); font-size:12px;">Upload Fixed Assets Register</div>
+            <div style="font-size:11px; color:var(--text-muted);">Purchase prices + depreciation schedules → enables AEMP 700 ownership cost layer for full TCO curves</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Annual R&M by AEMP Code — Trend <span class="aemp-tag">2021-2025</span></div>
+      <div class="chart-wrap" style="height:220px;">
+        <canvas id="chart-code-trend"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== FLEET MANAGER ===================== -->
+<div class="view" id="view-fleet_manager">
+  <div class="section-label">Fleet Manager — Active &amp; Disposed Units</div>
+
+  <!-- MISSING PURCHASE PRICE -->
+  <div class="panel panel-full warn" style="margin-bottom:14px;">
+    <div class="panel-title">⚠ Missing Purchase Price — Active Heavy Equipment <span class="aemp-tag">AEMP CODE 700</span></div>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;">The following active units are missing purchase price data. Without this, depreciation and full TCO cost-per-hour cannot be calculated. Add the purchase price to your next data upload to complete the ownership cost model.</div>
+    <table class="data-table">
+      <thead><tr><th>Unit #</th><th>Model</th><th>Class</th><th>Model Year</th><th>Age</th><th>5-Yr R&M</th><th>Impact</th></tr></thead>
+      <tbody id="missing-price-tbody"></tbody>
+    </table>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+
+    <!-- ADD SOLD UNIT -->
+    <div class="panel accent">
+      <div class="panel-title">Mark Unit as Sold / Disposed</div>
+      <div class="fm-input-row">
+        <div class="fm-field">
+          <label>Unit #</label>
+          <input class="fm-input" id="fm-unit-id" placeholder="e.g. 101" style="width:80px;" type="number">
+        </div>
+        <div class="fm-field">
+          <label>Sale / Disposal Date</label>
+          <input class="fm-input" id="fm-sale-date" type="date" style="width:150px;">
+        </div>
+        <div class="fm-field">
+          <label>Sale Price (optional)</label>
+          <input class="fm-input" id="fm-sale-price" placeholder="$0" style="width:110px;">
+        </div>
+        <div class="fm-field" style="justify-content:flex-end;">
+          <button class="fm-btn primary" onclick="markSold()">+ Mark Sold</button>
+        </div>
+      </div>
+      <div id="fm-error" style="font-size:11px;color:var(--danger);min-height:16px;font-family:'IBM Plex Mono',monospace;margin-top:4px;"></div>
+
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">
+          Once marked sold, the unit is <strong style="color:var(--accent)">excluded from all active fleet charts, KPIs, and tables</strong> across every tab. Its historical cost data is preserved in the Disposed Units log below for reference and TCO auditing.
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">
+          ✓ Saved to browser storage &nbsp;·&nbsp; ✓ Persists between sessions &nbsp;·&nbsp; ✓ Reversible at any time
+        </div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="panel">
+      <div class="panel-title">Fleet Roster Summary</div>
+      <div class="fm-stats" style="flex-wrap:wrap;">
+        <div class="fm-stat">
+          <div class="fm-stat-val" id="fm-stat-active">—</div>
+          <div class="fm-stat-lbl">Active Units</div>
+        </div>
+        <div class="fm-stat">
+          <div class="fm-stat-val" id="fm-stat-sold" style="color:var(--warn);">—</div>
+          <div class="fm-stat-lbl">Disposed Units</div>
+        </div>
+        <div class="fm-stat">
+          <div class="fm-stat-val" id="fm-stat-rm-active" style="color:var(--accent3);">—</div>
+          <div class="fm-stat-lbl">Active Fleet 5-Yr R&M</div>
+        </div>
+        <div class="fm-stat">
+          <div class="fm-stat-val" id="fm-stat-rm-sold" style="color:var(--text-muted);">—</div>
+          <div class="fm-stat-lbl">Disposed Fleet 5-Yr R&M</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text-dim);">
+        The header badge updates live as you add/remove units. All charts across the dashboard recalculate automatically to reflect only active units.
+      </div>
+      <div style="margin-top:12px;">
+        <button class="fm-btn ghost" onclick="exportSoldList()" style="margin-right:8px;">⬇ Export List</button>
+        <button class="fm-btn danger" onclick="clearAllSold()">✕ Clear All Disposed</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISPOSED UNITS TABLE -->
+  <div class="panel panel-full">
+    <div class="panel-title">
+      Disposed Units Log
+      <span id="fm-disposed-count" class="filter-badge">0 units</span>
+    </div>
+    <div class="search-box">
+      <input class="fm-input" id="fm-search" placeholder="Search by unit # or model name…" style="width:280px;" oninput="renderSoldList()">
+      <button class="fm-btn ghost" onclick="document.getElementById('fm-search').value='';renderSoldList()">Clear</button>
+    </div>
+    <div class="sold-list-wrap" id="fm-sold-list">
+      <div style="color:var(--text-muted);font-size:12px;padding:20px 0;text-align:center;font-family:'IBM Plex Mono',monospace;">
+        No units marked as disposed yet. Use the form above to add sold equipment.
+      </div>
+    </div>
+  </div>
+
+  <!-- FULL FLEET ROSTER -->
+  <div class="panel panel-full" style="margin-top:14px;">
+    <div class="panel-title">Full Fleet Roster — All Known Units <span class="aemp-tag">TOGGLE ACTIVE/DISPOSED</span></div>
+    <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="fm-btn ghost" onclick="filterRoster('all')" id="roster-btn-all" style="border-color:var(--accent);color:var(--accent);">All</button>
+      <button class="fm-btn ghost" onclick="filterRoster('active')" id="roster-btn-active">Active Only</button>
+      <button class="fm-btn ghost" onclick="filterRoster('disposed')" id="roster-btn-disposed">Disposed Only</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data-table" id="roster-table">
+        <thead>
+          <tr>
+            <th>Unit #</th><th>Model</th><th>Type</th><th>Class</th><th>Model Yr</th><th>Age</th>
+            <th>Serial #</th><th>5-Yr R&M</th><th>Avg $/Yr</th><th>Status</th><th>Sold Date</th><th>Sale Price</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="roster-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:24px;width:440px;max-width:95vw;position:relative;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:18px;color:var(--accent);margin-bottom:4px;">Edit Equipment Details</div>
+    <div style="font-size:11px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;margin-bottom:18px;" id="edit-modal-subtitle">Unit #—</div>
+
+    <div class="fm-field" style="margin-bottom:12px;">
+      <label>Unit # (read-only)</label>
+      <input class="fm-input" id="edit-unit-id" readonly style="width:100%;opacity:0.5;">
+    </div>
+    <div class="fm-field" style="margin-bottom:12px;">
+      <label>Model / Description</label>
+      <input class="fm-input" id="edit-unit-name" placeholder="e.g. CAT 336 GC" style="width:100%;">
+    </div>
+    <div class="fm-field" style="margin-bottom:12px;">
+      <label>Fleet Class</label>
+      <select class="fm-input" id="edit-unit-cls" style="width:100%;">
+        <option value="Excavators">Excavators</option>
+        <option value="Dozers">Dozers</option>
+        <option value="Articulated Trucks">Articulated Trucks</option>
+        <option value="Rollers/Compactors">Rollers/Compactors</option>
+        <option value="Compaction/Loaders">Compaction/Loaders</option>
+        <option value="Support/Misc">Support/Misc</option>
+        <option value="Trucks/Vehicles">Trucks/Vehicles</option>
+        <option value="Trailers">Trailers</option>
+      </select>
+    </div>
+    <div class="fm-field" style="margin-bottom:18px;">
+      <label>Model Year</label>
+      <input class="fm-input" id="edit-unit-yr" type="number" min="1980" max="2030" style="width:120px;">
+    </div>
+
+    <div id="edit-modal-error" style="font-size:11px;color:var(--danger);min-height:16px;font-family:'IBM Plex Mono',monospace;margin-bottom:10px;"></div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="fm-btn ghost" onclick="closeEditModal()">Cancel</button>
+      <button class="fm-btn danger" onclick="resetUnitToDefault()" style="margin-right:auto;">↺ Reset to Default</button>
+      <button class="fm-btn primary" onclick="saveUnitEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== LIVE TELEMATICS ===================== -->
+<div class="view" id="view-telematics">
+  <div class="section-label">📡 Live Telematics — VisionLink ISO 15143-3</div>
+
+  <!-- API SETTINGS PANEL -->
+  <div class="panel accent" style="margin-bottom:14px;">
+    <div class="panel-title">API Connection Settings <span class="aemp-tag">STORED LOCALLY — NEVER TRANSMITTED</span></div>
+    <div class="fm-input-row" style="align-items:flex-end;flex-wrap:wrap;gap:12px;">
+      <div class="fm-field" style="flex:1;min-width:280px;">
+        <label>API Base URL</label>
+        <input class="fm-input" id="tl-base-url" placeholder="https://api.cat.com/telematics/iso15143/fleet" style="width:100%;">
+      </div>
+      <div class="fm-field" style="flex:1;min-width:200px;">
+        <label>Client ID</label>
+        <input class="fm-input" id="tl-client-id" placeholder="Your client ID" style="width:100%;">
+      </div>
+      <div class="fm-field" style="flex:1;min-width:200px;">
+        <label>Client Secret</label>
+        <input class="fm-input" id="tl-client-secret" type="password" placeholder="Your client secret" style="width:100%;">
+      </div>
+      <div class="fm-field" style="flex:1;min-width:200px;">
+        <label>Token URL</label>
+        <input class="fm-input" id="tl-token-url" placeholder="OAuth token endpoint" style="width:100%;">
+      </div>
+      <div class="fm-field" style="flex:1;min-width:200px;">
+        <label>Scope (if required)</label>
+        <input class="fm-input" id="tl-scope" placeholder="e.g. api://abc/.default" style="width:100%;">
+      </div>
+      <div class="fm-field" style="justify-content:flex-end;flex-direction:row;gap:8px;">
+        <button class="fm-btn ghost" onclick="saveTelemSettings()">💾 Save</button>
+        <button class="fm-btn primary" onclick="fetchTelematics()">▶ Connect & Fetch</button>
+      </div>
+    </div>
+    <div id="tl-error" style="font-size:11px;color:var(--danger);min-height:16px;font-family:'IBM Plex Mono',monospace;margin-top:6px;"></div>
+    <div style="font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;margin-top:8px;">
+      ✓ Credentials saved to browser storage only &nbsp;·&nbsp; ✓ Never sent anywhere except directly to the API &nbsp;·&nbsp; ✓ Clear browser data to remove
+    </div>
+  </div>
+
+  <!-- CONNECTION STATUS -->
+  <div class="panel-grid-4" style="margin-bottom:14px;">
+    <div class="panel blue">
+      <div class="panel-title">Connection Status</div>
+      <div class="kpi-value" id="tl-kpi-status" style="font-size:24px;">—</div>
+      <div class="kpi-sub" id="tl-kpi-status-sub">Not connected</div>
+    </div>
+    <div class="panel green">
+      <div class="panel-title">Units Reporting</div>
+      <div class="kpi-value green" id="tl-kpi-units">—</div>
+      <div class="kpi-sub" id="tl-kpi-units-sub">Last fetch: never</div>
+    </div>
+    <div class="panel accent">
+      <div class="panel-title">Units Running Now</div>
+      <div class="kpi-value accent" id="tl-kpi-running">—</div>
+      <div class="kpi-sub">Engine status = ON</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Units w/ Hours Data</div>
+      <div class="kpi-value" id="tl-kpi-hours">—</div>
+      <div class="kpi-sub">Cumulative operating hours</div>
+    </div>
+  </div>
+
+  <!-- LIVE EQUIPMENT TABLE -->
+  <div class="panel panel-full">
+    <div class="panel-title">
+      Live Fleet Status
+      <span id="tl-last-updated" style="font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;margin-left:8px;"></span>
+      <button class="fm-btn ghost" onclick="fetchTelematics()" style="padding:3px 10px;font-size:11px;margin-left:8px;">↻ Refresh</button>
+    </div>
+    <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="fm-btn ghost" onclick="filterTelem('all')" id="tl-btn-all" style="border-color:var(--accent2);color:var(--accent2);padding:4px 10px;font-size:11px;">All</button>
+      <button class="fm-btn ghost" onclick="filterTelem('running')" id="tl-btn-running" style="padding:4px 10px;font-size:11px;">Running</button>
+      <button class="fm-btn ghost" onclick="filterTelem('hours')" id="tl-btn-hours" style="padding:4px 10px;font-size:11px;">Has Hours</button>
+      <button class="fm-btn ghost" onclick="filterTelem('idle')" id="tl-btn-idle" style="padding:4px 10px;font-size:11px;">Idle / Off</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Unit #</th><th>Model</th><th>Class</th>
+            <th>Engine</th><th>Cum. Hours</th><th>Est. Cost/Hr</th>
+            <th>Last Report</th><th>Odometer</th><th>TCO Status</th>
+          </tr>
+        </thead>
+        <tbody id="tl-tbody">
+          <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:30px;font-family:'IBM Plex Mono',monospace;">Connect to VisionLink to load live data</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- HOURS-BASED REPLACEMENT FLAGS -->
+  <div class="panel panel-full warn" style="margin-top:14px;" id="tl-hours-flags-panel">
+    <div class="panel-title">⚠ Hours-Based Economic Life Flags <span class="aemp-tag">REQUIRES LIVE DATA</span></div>
+    <div style="font-size:11px;color:var(--text-dim);">Units exceeding class economic life thresholds will appear here once telematics hours are loaded. Connect to VisionLink above to populate.</div>
+    <table class="data-table" style="margin-top:12px;display:none;" id="tl-hours-flags-table">
+      <thead><tr><th>Unit #</th><th>Model</th><th>Class</th><th>Hours</th><th>Life Threshold</th><th>% of Life Used</th><th>R&M/Hr</th><th>Action</th></tr></thead>
+      <tbody id="tl-hours-flags-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- .main -->
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const data = {
+  years: ['2021','2022','2023','2024','2025'],
+  totals: [288013, 538688, 784083, 760150, 1193937],
+  pm: [161701, 231741, 308695, 315689, 368564],
+  repair: [126311, 306946, 475387, 444460, 825372],
+
+  fleetTrend: {
+    'Excavators':       [85433, 181517, 269903, 228669, 283790],
+    'Dozers':           [78587, 163426, 148484, 159239, 290332],
+    'Art. Trucks':      [36284,  56190, 216996, 225314, 374514],
+    'Rollers':          [30444,  80254,  51922,  39567, 127612],
+    'Loaders':          [16749,  49960,  81747,  63350,  62264],
+    'Support':          [40515,   7339,  15029,  44007,  55422],
+  },
+
+  top10_2024: [
+    {id:209, name:'CAT D6T XW',    cls:'Dozers',      age:10, total:46053, pm:10858, repair:35195, pmr:23.6},
+    {id:501, name:'CAT 725 Water', cls:'Art.Trucks',  age:20, total:39664, pm:  907, repair:38756, pmr: 2.3},
+    {id:608, name:'Bomag BT65',    cls:'Support',     age: 6, total:38898, pm: 4038, repair:34860, pmr:10.4},
+    {id:102, name:'CAT 325D',      cls:'Excavators',  age:17, total:36523, pm:28383, repair: 8139, pmr:77.7},
+    {id:202, name:'CAT D5G LGP',   cls:'Dozers',      age:19, total:31100, pm: 1343, repair:29756, pmr: 4.3},
+    {id:101, name:'CAT 320C',      cls:'Excavators',  age:18, total:21473, pm: 2866, repair:18606, pmr:13.3},
+    {id:502, name:'CAT 725C',      cls:'Art.Trucks',  age: 9, total:19131, pm: 7579, repair:11552, pmr:39.6},
+    {id:305, name:'CAT IT28G',     cls:'Loaders',     age:27, total:18625, pm:12995, repair: 5629, pmr:69.8},
+    {id:110, name:'CAT 349F',      cls:'Excavators',  age: 8, total:18201, pm:15261, repair: 2939, pmr:83.8},
+    {id:109, name:'CAT 349F',      cls:'Excavators',  age: 9, total:18016, pm:16840, repair: 1175, pmr:93.4},
+  ],
+
+  pmByClass: {
+    'Excavators':  {pmr:0.569, total:680090},
+    'Dozers':      {pmr:0.664, total:471150},
+    'Art.Trucks':  {pmr:0.492, total:498501},
+    'Rollers':     {pmr:0.365, total:171744},
+    'Loaders':     {pmr:0.483, total:195059},
+  },
+
+  cumulative: [
+    {id:109, name:'CAT 349F',      yr:2015, total:199403, avg:39880},
+    {id:209, name:'CAT D6T XW',    yr:2014, total:153467, avg:30693},
+    {id:206, name:'CAT D6T XW',    yr:2012, total:150288, avg:30057},
+    {id:102, name:'CAT 325D',      yr:2007, total:148883, avg:29776},
+    {id:501, name:'CAT 725 Water', yr:2004, total:109900, avg:21980},
+    {id:502, name:'CAT 725C',      yr:2015, total: 96999, avg:19399},
+    {id:202, name:'CAT D5G LGP',   yr:2005, total: 96656, avg:19331},
+    {id:101, name:'CAT 320C',      yr:2006, total: 94156, avg:18831},
+    {id:110, name:'CAT 349F',      yr:2016, total: 93427, avg:18685},
+    {id:504, name:'CAT 725C',      yr:2015, total: 87854, avg:17570},
+    {id:604, name:'Multiquip P33', yr:2007, total: 71527, avg:14305},
+    {id:401, name:'Bomag BW213DH', yr:2011, total: 71171, avg:14234},
+    {id:608, name:'Bomag BT65',    yr:2018, total: 60110, avg:12022},
+    {id:503, name:'CAT 725C',      yr:2015, total: 56531, avg:11306},
+    {id:305, name:'CAT IT28G',     yr:1997, total: 49500, avg: 9900},
+  ],
+
+  replacement: [
+    {id:501, name:'CAT 725 Water', yr:2004, age:21, cls:'Art.Trucks',   cum5:109900, avg:21980, econLife:'8–12yr',  status:'critical'},
+    {id:202, name:'CAT D5G LGP',   yr:2005, age:20, cls:'Dozers',       cum5: 96656, avg:19331, econLife:'10–14yr', status:'critical'},
+    {id:201, name:'CAT D5G LGP',   yr:2004, age:21, cls:'Dozers',       cum5: 45176, avg: 9035, econLife:'10–14yr', status:'critical'},
+    {id:305, name:'CAT IT28G',     yr:1997, age:28, cls:'Loaders',      cum5: 49500, avg: 9900, econLife:'10–14yr', status:'critical'},
+    {id:102, name:'CAT 325D',      yr:2007, age:18, cls:'Excavators',   cum5:148883, avg:29776, econLife:'10–15yr', status:'critical'},
+    {id:101, name:'CAT 320C',      yr:2006, age:19, cls:'Excavators',   cum5: 94156, avg:18831, econLife:'10–15yr', status:'critical'},
+    {id:206, name:'CAT D6T XW',    yr:2012, age:13, cls:'Dozers',       cum5:150288, avg:30057, econLife:'10–14yr', status:'monitor'},
+    {id:209, name:'CAT D6T XW',    yr:2014, age:11, cls:'Dozers',       cum5:153467, avg:30693, econLife:'10–14yr', status:'monitor'},
+    {id:401, name:'Bomag BW213DH', yr:2011, age:14, cls:'Rollers',      cum5: 71171, avg:14234, econLife:'10–15yr', status:'monitor'},
+    {id:502, name:'CAT 725C',      yr:2015, age:10, cls:'Art.Trucks',   cum5: 96999, avg:19399, econLife:'8–12yr',  status:'monitor'},
+    {id:503, name:'CAT 725C',      yr:2015, age:10, cls:'Art.Trucks',   cum5: 56531, avg:11306, econLife:'8–12yr',  status:'monitor'},
+    {id:504, name:'CAT 725C',      yr:2015, age:10, cls:'Art.Trucks',   cum5: 87854, avg:17570, econLife:'8–12yr',  status:'monitor'},
+    {id:109, name:'CAT 349F',      yr:2015, age:10, cls:'Excavators',   cum5:199403, avg:39880, econLife:'10–15yr', status:'monitor'},
+    {id:103, name:'CAT 304C CR',   yr:2010, age:15, cls:'Excavators',   cum5: 44467, avg: 8893, econLife:'10–15yr', status:'monitor'},
+    {id:604, name:'Multiquip P33', yr:2007, age:18, cls:'Support',      cum5: 71527, avg:14305, econLife:'10–15yr', status:'critical'},
+  ],
+};
+
+// ============================================================
+// CHART DEFAULTS
+// ============================================================
+Chart.defaults.color = '#475569';
+Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+Chart.defaults.font.size = 10;
+
+const classColors = {
+  'Excavators': '#2563eb',
+  'Dozers': '#d97706',
+  'Art. Trucks': '#059669',
+  'Rollers': '#7c3aed',
+  'Loaders': '#db2777',
+  'Support': '#64748b',
+};
+
+function fmt$(n) {
+  if(n >= 1000000) return '$' + (n/1000000).toFixed(2) + 'M';
+  if(n >= 1000) return '$' + (n/1000).toFixed(0) + 'K';
+  return '$' + n.toFixed(0);
+}
+
+// ============================================================
+// POPULATE TABLES
+// ============================================================
+function populateTop10() {
+  const tbody = document.getElementById('top10-tbody');
+  data.top10_2024.forEach(r => {
+    const pmrClass = r.pmr >= 70 ? 'flag-green' : r.pmr >= 40 ? 'flag-yellow' : 'flag-red';
+    const ageClass = r.age >= 18 ? 'flag-red' : r.age >= 12 ? 'flag-yellow' : '';
+    const signal = r.pmr < 25 ? '⚠ Low PM%' : r.age >= 18 ? '⚠ Age Risk' : '✓ Monitor';
+    const sigCls = signal.startsWith('⚠') ? 'flag-red' : 'flag-green';
+    tbody.innerHTML += `<tr>
+      <td class="equip-name">${r.id}</td>
+      <td class="equip-name">${r.name}</td>
+      <td style="color:var(--text-muted)">${r.cls}</td>
+      <td class="${ageClass}">${r.age}yr</td>
+      <td class="cost">${fmt$(r.total)}</td>
+      <td class="${pmrClass}">${r.pmr}%</td>
+      <td class="${sigCls}" style="font-size:10px">${signal}</td>
+    </tr>`;
+  });
+}
+
+function populateCumulative() {
+  const tbody = document.getElementById('cumulative-tbody');
+  data.cumulative.forEach(r => {
+    tbody.innerHTML += `<tr>
+      <td class="equip-name">${r.id}</td>
+      <td>${r.name}</td>
+      <td class="cost">${fmt$(r.total)}</td>
+      <td style="color:var(--text-dim)">${fmt$(r.avg)}</td>
+    </tr>`;
+  });
+}
+
+function populateReplacement() {
+  const tbody = document.getElementById('replacement-tbody');
+  data.replacement.forEach(r => {
+    const badge = `<span class="rep-badge ${r.status}">${r.status === 'critical' ? '● CRITICAL' : r.status === 'monitor' ? '◐ MONITOR' : '○ HOLD'}</span>`;
+    const trend = r.avg > 25000 ? '▲ HIGH' : r.avg > 15000 ? '▲ ELEVATED' : '→ MODERATE';
+    const trendCls = r.avg > 25000 ? 'flag-red' : r.avg > 15000 ? 'flag-yellow' : 'flag-green';
+    tbody.innerHTML += `<tr>
+      <td class="equip-name">${r.id}</td>
+      <td>${r.name}</td>
+      <td style="color:var(--text-muted)">${r.yr}</td>
+      <td style="color:${r.age>=18?'var(--danger)':r.age>=12?'var(--warn)':'var(--text-dim)'}">${r.age}yr</td>
+      <td style="color:var(--text-muted)">${r.cls}</td>
+      <td class="cost">${fmt$(r.cum5)}</td>
+      <td style="color:var(--text-dim)">${fmt$(r.avg)}/yr</td>
+      <td style="color:var(--text-muted)">${r.econLife}</td>
+      <td class="${trendCls}" style="font-size:10px">${trend}</td>
+      <td>${badge}</td>
+    </tr>`;
+  });
+}
+
+function populatePMBars() {
+  const container = document.getElementById('pm-bars');
+  Object.entries(data.pmByClass).forEach(([cls, d]) => {
+    const pct = (d.pmr * 100).toFixed(0);
+    const color = d.pmr >= 0.7 ? 'var(--accent3)' : d.pmr >= 0.5 ? 'var(--warn)' : 'var(--danger)';
+    container.innerHTML += `
+      <div class="progress-row">
+        <div class="progress-label"><span>${cls}</span><span class="val" style="color:${color}">${pct}% PM</span></div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:${pct}%; background:${color}"></div>
+        </div>
+      </div>`;
+  });
+  // Target line indicator
+  container.innerHTML += `<div style="margin-top:10px; font-size:10px; color:var(--text-muted); border-top:1px dashed var(--border); padding-top:8px;">▲ AEMP Target: 70% PM Ratio &nbsp;|&nbsp; Only Dozers (66%) approach target</div>`;
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+function initCharts() {
+  // TREND - stacked area
+  new Chart(document.getElementById('chart-trend'), {
+    type: 'bar',
+    data: {
+      labels: data.years,
+      datasets: Object.entries(data.fleetTrend).map(([cls, vals]) => ({
+        label: cls,
+        data: vals,
+        backgroundColor: classColors[cls] || '#6b7280',
+        borderWidth: 0,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { boxWidth: 10, padding: 12, font: {size:10} } } },
+      scales: {
+        x: { stacked: true, grid: { color: 'rgba(42,51,71,0.4)' }, ticks: { font: {size:10} } },
+        y: { stacked: true, grid: { color: 'rgba(42,51,71,0.4)' },
+          ticks: { callback: v => fmt$(v), font: {size:10} } }
+      }
+    }
+  });
+
+  // FLEET PIE
+  new Chart(document.getElementById('chart-fleet-pie'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Excavators','Dozers','Art.Trucks','Rollers','Loaders','Support'],
+      datasets: [{
+        data: [18, 12, 9, 8, 7, 10],
+        backgroundColor: ['#3b82f6','#f59e0b','#10b981','#a78bfa','#f472b6','#6b7280'],
+        borderWidth: 0,
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  // YOY LINE
+  new Chart(document.getElementById('chart-yoy'), {
+    type: 'bar',
+    data: {
+      labels: data.years,
+      datasets: [
+        { label: 'PM (Code 100)', data: data.pm, backgroundColor: 'rgba(16,185,129,0.7)', borderWidth: 0 },
+        { label: 'Repair (Code 200)', data: data.repair, backgroundColor: 'rgba(239,68,68,0.7)', borderWidth: 0 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { boxWidth: 10, font:{size:10} } } },
+      scales: {
+        x: { stacked: true, grid: { color: 'rgba(42,51,71,0.4)' } },
+        y: { stacked: true, grid: { color: 'rgba(42,51,71,0.4)' }, ticks: { callback: v => fmt$(v) } }
+      }
+    }
+  });
+
+  // COHORT BAR
+  new Chart(document.getElementById('chart-cohort'), {
+    type: 'bar',
+    data: {
+      labels: ['4–7yr','8–12yr','13–20yr','21+yr'],
+      datasets: [{
+        label: 'Avg Annual R&M/Unit (2024)',
+        data: [38898, 16890, 14175, 11229],
+        backgroundColor: ['#10b981','#f59e0b','#f97316','#ef4444'],
+        borderWidth: 0,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => fmt$(ctx.raw) } }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { color: 'rgba(42,51,71,0.4)' }, ticks: { callback: v => fmt$(v) } }
+      }
+    }
+  });
+
+  // SPLIT BAR (R&M Analysis)
+  new Chart(document.getElementById('chart-split-bar'), {
+    type: 'bar',
+    data: {
+      labels: data.years,
+      datasets: [
+        { label: 'Routine Maintenance (AEMP 100)', data: data.pm,    backgroundColor: 'rgba(16,185,129,0.75)', borderWidth:0 },
+        { label: 'Major Repairs (AEMP 200)',        data: data.repair, backgroundColor: 'rgba(239,68,68,0.75)', borderWidth:0 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 10, font:{size:10} } },
+        annotation: {}
+      },
+      scales: {
+        x: { stacked: true, grid: { color: 'rgba(42,51,71,0.4)' } },
+        y: { stacked: true, grid: { color: 'rgba(42,51,71,0.4)' }, ticks: { callback: v => fmt$(v) } }
+      }
+    }
+  });
+
+  // PMR BAR CHART
+  const pmrClasses = Object.keys(data.pmByClass);
+  const pmrVals = pmrClasses.map(c => (data.pmByClass[c].pmr * 100).toFixed(1));
+  new Chart(document.getElementById('chart-pmr'), {
+    type: 'bar',
+    data: {
+      labels: pmrClasses,
+      datasets: [{
+        label: 'PMR %',
+        data: pmrVals,
+        backgroundColor: pmrVals.map(v => v >= 70 ? 'rgba(16,185,129,0.75)' : v >= 50 ? 'rgba(249,115,22,0.75)' : 'rgba(239,68,68,0.75)'),
+        borderWidth: 0, borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { max: 100, grid: { color: 'rgba(42,51,71,0.4)' }, ticks: { callback: v => v + '%' } }
+      }
+    }
+  });
+
+  // STACKED CLASS (Fleet Classes tab)
+  new Chart(document.getElementById('chart-stacked-class'), {
+    type: 'bar',
+    data: {
+      labels: data.years,
+      datasets: Object.entries(data.fleetTrend).map(([cls, vals]) => ({
+        label: cls, data: vals,
+        backgroundColor: classColors[cls] || '#6b7280', borderWidth: 0,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { boxWidth: 10, font:{size:10} } } },
+      scales: {
+        x: { stacked: true, grid: { color: 'rgba(42,51,71,0.4)' } },
+        y: { stacked: true, grid: { color: 'rgba(42,51,71,0.4)' }, ticks: { callback: v => fmt$(v) } }
+      }
+    }
+  });
+
+  // TCO CURVE (illustrative)
+  const ages = Array.from({length:16}, (_,i) => i+1);
+  const ownership = ages.map(a => 120 - a*5.2 + (a>10?a*0.8:0)); // declining ownership cost
+  const rm = ages.map(a => 8 + a*1.8 + (a>10?(a-10)*3.5:0)); // rising R&M cost
+  const tco = ages.map((a,i) => (ownership[i] + rm[i] + 22) / (2000 - a*30));
+
+  new Chart(document.getElementById('chart-tco'), {
+    type: 'line',
+    data: {
+      labels: ages.map(a => a + 'yr'),
+      datasets: [
+        { label: 'Ownership $/yr', data: ownership, borderColor: '#3b82f6', borderWidth: 2, tension: 0.4, fill: false, pointRadius: 0 },
+        { label: 'R&M $/yr (index)', data: rm, borderColor: '#ef4444', borderWidth: 2, tension: 0.4, fill: false, pointRadius: 0 },
+        { label: 'TCO $/hr (×100)', data: tco.map(v=>v*100), borderColor: '#f59e0b', borderWidth: 2.5, tension: 0.4, fill: false, pointRadius: 3, borderDash: [] }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 10, font:{size:10} } },
+        annotation: {}
+      },
+      scales: {
+        x: { grid: { color: 'rgba(42,51,71,0.4)' } },
+        y: { grid: { color: 'rgba(42,51,71,0.4)' }, ticks: { font:{size:9} } }
+      }
+    }
+  });
+
+  // ESCALATION CHART (key units over years)
+  const escalUnits = {
+    'CAT D6T 209': [16000,28000,30000,46053,65000],
+    'CAT 725W 501': [12000,8000,18000,39664,48000],
+    'CAT 349F 109': [25000,48000,55000,18016,53000],
+    'CAT D5G 202': [15000,22000,28000,31100,38000],
+  };
+  new Chart(document.getElementById('chart-escalation'), {
+    type: 'line',
+    data: {
+      labels: data.years,
+      datasets: Object.entries(escalUnits).map(([label, vals], i) => ({
+        label, data: vals,
+        borderColor: ['#ef4444','#f59e0b','#3b82f6','#a78bfa'][i],
+        borderWidth: 2, tension: 0.3, fill: false, pointRadius: 3
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { boxWidth: 10, font:{size:10} } } },
+      scales: {
+        x: { grid: { color: 'rgba(42,51,71,0.4)' } },
+        y: { grid: { color: 'rgba(42,51,71,0.4)' }, ticks: { callback: v => fmt$(v) } }
+      }
+    }
+  });
+
+  // COST CODE PIE
+  new Chart(document.getElementById('chart-cost-code-pie'), {
+    type: 'doughnut',
+    data: {
+      labels: ['AEMP 200 Major Repairs','AEMP 100 Routine Maint.','Telematics (AEMP 800)','Other / Unclassified'],
+      datasets: [{
+        data: [444460, 315690, 2556, 0],
+        backgroundColor: ['#ef4444','#10b981','#3b82f6','#6b7280'],
+        borderWidth: 0, hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '55%',
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font:{size:10}, padding: 12 } } }
+    }
+  });
+
+  // CODE TREND
+  new Chart(document.getElementById('chart-code-trend'), {
+    type: 'line',
+    data: {
+      labels: data.years,
+      datasets: [
+        { label: 'AEMP 100 (PM)', data: data.pm, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', borderWidth:2, fill:true, tension:0.3, pointRadius:4 },
+        { label: 'AEMP 200 (Repair)', data: data.repair, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', borderWidth:2, fill:true, tension:0.3, pointRadius:4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { boxWidth:10, font:{size:10} } } },
+      scales: {
+        x: { grid: { color: 'rgba(42,51,71,0.4)' } },
+        y: { grid: { color: 'rgba(42,51,71,0.4)' }, ticks: { callback: v => fmt$(v) } }
+      }
+    }
+  });
+
+  // PM SCATTER (R&M analysis)
+  const scatterUnits = data.top10_2024.slice(0, 10);
+  new Chart(document.getElementById('chart-pm-scatter'), {
+    type: 'bar',
+    data: {
+      labels: scatterUnits.map(u => `${u.id}`),
+      datasets: [
+        { label: 'Repair Cost', data: scatterUnits.map(u => u.repair), backgroundColor: 'rgba(239,68,68,0.7)', borderWidth:0 },
+        { label: 'PM Cost',     data: scatterUnits.map(u => u.pm),     backgroundColor: 'rgba(16,185,129,0.7)', borderWidth:0 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { boxWidth:10, font:{size:10} } } },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, grid: { color: 'rgba(42,51,71,0.4)' }, ticks: { callback: v => fmt$(v) } }
+      }
+    }
+  });
+}
+
+// ============================================================
+// EQUIPMENT EDITOR — name, class, model year overrides
+// ============================================================
+const EDITS_KEY = 'fleetops_equip_edits';
+
+function loadEquipEdits() {
+  try { return JSON.parse(localStorage.getItem(EDITS_KEY) || '{}'); }
+  catch(e) { return {}; }
+}
+function saveEquipEdits(obj) {
+  localStorage.setItem(EDITS_KEY, JSON.stringify(obj));
+}
+
+function getUnit(id) {
+  const base = fleetRoster.find(u => u.id === id);
+  if (!base) return null;
+  const edits = loadEquipEdits();
+  const override = edits[id] || {};
+  return { ...base, ...override };
+}
+
+function openEditModal(id) {
+  const u = getUnit(id);
+  if (!u) return;
+  document.getElementById('edit-unit-id').value = u.id;
+  document.getElementById('edit-modal-subtitle').textContent = `Unit #${u.id} · ${u.name}`;
+  document.getElementById('edit-unit-name').value = u.name;
+  document.getElementById('edit-unit-cls').value = u.cls;
+  document.getElementById('edit-unit-yr').value = u.yr;
+  document.getElementById('edit-modal-error').textContent = '';
+  const modal = document.getElementById('edit-modal');
+  modal.style.display = 'flex';
+  modal.onclick = (e) => { if (e.target === modal) closeEditModal(); };
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+}
+
+function saveUnitEdit() {
+  const id = parseInt(document.getElementById('edit-unit-id').value);
+  const name = document.getElementById('edit-unit-name').value.trim();
+  const cls  = document.getElementById('edit-unit-cls').value;
+  const yr   = parseInt(document.getElementById('edit-unit-yr').value);
+  const errEl = document.getElementById('edit-modal-error');
+
+  if (!name) { errEl.textContent = '⚠ Model name cannot be blank.'; return; }
+  if (!yr || yr < 1980 || yr > 2030) { errEl.textContent = '⚠ Enter a valid model year (1980–2030).'; return; }
+
+  const edits = loadEquipEdits();
+  edits[id] = { name, cls, yr };
+  saveEquipEdits(edits);
+  closeEditModal();
+  refreshFleetManager();
+  showToast(`Unit ${id} updated: ${name} · ${cls} · ${yr} ✓`);
+}
+
+function resetUnitToDefault() {
+  const id = parseInt(document.getElementById('edit-unit-id').value);
+  const edits = loadEquipEdits();
+  delete edits[id];
+  saveEquipEdits(edits);
+  closeEditModal();
+  refreshFleetManager();
+  showToast(`Unit ${id} reset to original values`);
+}
+
+// ============================================================
+// LIVE TELEMATICS — VisionLink ISO 15143-3
+// ============================================================
+const TELEM_KEY = 'fleetops_telem_settings';
+const TELEM_CACHE_KEY = 'fleetops_telem_cache';
+
+// Economic life thresholds by class (hours)
+const econLifeHours = {
+  'Excavators': 12000,
+  'Dozers': 14000,
+  'Articulated Trucks': 15000,
+  'Rollers/Compactors': 10000,
+  'Compaction/Loaders': 8000,
+  'Support/Misc': 8000,
+};
+
+let telemData = []; // live data store
+let telemFilter = 'all';
+
+function loadTelemSettings() {
+  try { return JSON.parse(localStorage.getItem(TELEM_KEY) || '{}'); }
+  catch(e) { return {}; }
+}
+
+function saveTelemSettings() {
+  const settings = {
+    baseUrl: document.getElementById('tl-base-url').value.trim(),
+    clientId: document.getElementById('tl-client-id').value.trim(),
+    clientSecret: document.getElementById('tl-client-secret').value.trim(),
+    tokenUrl: document.getElementById('tl-token-url').value.trim(),
+    scope: document.getElementById('tl-scope').value.trim(),
+  };
+  if (!settings.baseUrl || !settings.clientId || !settings.clientSecret || !settings.tokenUrl) {
+    document.getElementById('tl-error').textContent = '⚠ Base URL, Client ID, Client Secret and Token URL are required.';
+    return;
+  }
+  localStorage.setItem(TELEM_KEY, JSON.stringify(settings));
+  document.getElementById('tl-error').textContent = '';
+  showToast('API settings saved ✓');
+}
+
+function populateTelemFields() {
+  const s = loadTelemSettings();
+  if (s.baseUrl) document.getElementById('tl-base-url').value = s.baseUrl;
+  if (s.clientId) document.getElementById('tl-client-id').value = s.clientId;
+  if (s.clientSecret) document.getElementById('tl-client-secret').value = s.clientSecret;
+  if (s.tokenUrl) document.getElementById('tl-token-url').value = s.tokenUrl;
+  if (s.scope) document.getElementById('tl-scope').value = s.scope;
+  const urlField = document.getElementById('tl-base-url');
+  if (!urlField.value) urlField.value = 'https://api.cat.com/telematics/iso15143/fleet';
+  const tokenField = document.getElementById('tl-token-url');
+  if (!tokenField.value) tokenField.value = 'https://login.microsoftonline.com/ceb177bf-013b-49ab-8a9c-4abce32afc1e/oauth2/v2.0/token';
+  const scopeField = document.getElementById('tl-scope');
+  if (!scopeField.value) scopeField.value = '109f6136-9ae8-4079-875f-546f08bba813/.default';
+}
+
+const PROXY_URL = 'https://fleetproxy2.m7fwpj76v2.workers.dev';
+
+async function getAccessToken(tokenUrl, clientId, clientSecret, scope) {
+  let body = `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}`;
+  if (scope) body += `&scope=${encodeURIComponent(scope)}`;
+  const proxied = `${PROXY_URL}?target=${encodeURIComponent(tokenUrl)}`;
+  const resp = await fetch(proxied, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Token request failed: ${resp.status} — ${errText}`);
+  }
+  const data = await resp.json();
+  if (!data.access_token) throw new Error(`No access token returned: ${JSON.stringify(data)}`);
+  return data.access_token;
+}
+
+async function fetchTelematics() {
+  const errEl = document.getElementById('tl-error');
+  errEl.textContent = '';
+
+  saveTelemSettings();
+  const s = loadTelemSettings();
+
+  if (!s.baseUrl || !s.clientId || !s.clientSecret || !s.tokenUrl) {
+    errEl.textContent = '⚠ Please fill in all API settings and save before connecting.';
+    return;
+  }
+
+  document.getElementById('tl-kpi-status').textContent = '⟳';
+  document.getElementById('tl-kpi-status-sub').textContent = 'Connecting...';
+  document.getElementById('tl-tbody').innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:30px;font-family:'IBM Plex Mono',monospace;">Fetching live data...</td></tr>`;
+
+  try {
+    const token = await getAccessToken(s.tokenUrl, s.clientId, s.clientSecret, s.scope);
+
+    const baseUrl = s.baseUrl.replace(/\/$/, '').replace(/\/\d+$/, '');
+    const targetUrl = `${baseUrl}/1`;
+    const proxied = `${PROXY_URL}?target=${encodeURIComponent(targetUrl)}`;
+
+    const resp = await fetch(proxied, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/iso15143-snapshot+json',
+      }
+    });
+
+    if (!resp.ok) throw new Error(`API request failed: ${resp.status} ${resp.statusText}`);
+    const json = await resp.json();
+
+    telemData = json.Equipment || [];
+
+    localStorage.setItem(TELEM_CACHE_KEY, JSON.stringify({
+      data: telemData,
+      fetchedAt: new Date().toISOString()
+    }));
+
+    renderTelematics();
+    updateTelemHeader(true);
+    showToast(`✓ Live data loaded — ${telemData.length} units reporting`);
+
+  } catch(err) {
+    errEl.textContent = `⚠ ${err.message}`;
+    document.getElementById('tl-kpi-status').textContent = '✕';
+    document.getElementById('tl-kpi-status-sub').textContent = 'Connection failed';
+    updateTelemHeader(false);
+    console.error('Telematics fetch error:', err);
+  }
+}
+
+function renderTelematics() {
+  const tbody = document.getElementById('tl-tbody');
+  if (!telemData.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:30px;">No data returned from API.</td></tr>`;
+    return;
+  }
+
+  // Filter
+  let filtered = telemData;
+  if (telemFilter === 'running') filtered = telemData.filter(u => u.EngineStatus?.Running === true);
+  if (telemFilter === 'idle')    filtered = telemData.filter(u => u.EngineStatus?.Running === false);
+  if (telemFilter === 'hours')   filtered = telemData.filter(u => u.CumulativeOperatingHours?.Hour);
+
+  // Update KPIs
+  const running = telemData.filter(u => u.EngineStatus?.Running === true).length;
+  const withHours = telemData.filter(u => u.CumulativeOperatingHours?.Hour).length;
+  document.getElementById('tl-kpi-status').textContent = '✓';
+  document.getElementById('tl-kpi-status-sub').textContent = 'Connected · ISO 15143-3';
+  document.getElementById('tl-kpi-units').textContent = telemData.length;
+  document.getElementById('tl-kpi-units-sub').textContent = `Last fetch: ${new Date().toLocaleTimeString()}`;
+  document.getElementById('tl-kpi-running').textContent = running;
+  document.getElementById('tl-kpi-hours').textContent = withHours;
+  document.getElementById('tl-last-updated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+
+  // Hours flags
+  const flagged = [];
+
+  tbody.innerHTML = filtered.map(u => {
+    const header = u.EquipmentHeader || {};
+    const uid = parseInt(header.EquipmentID) || 0;
+    const unit = getUnit(uid) || { name: `${header.OEMName||''} ${header.Model||''}`.trim(), cls: 'Support/Misc', cum5: 0 };
+    const hours = u.CumulativeOperatingHours?.Hour;
+    const running = u.EngineStatus?.Running;
+    const lastReport = u.Location?.Datetime || u.CumulativeOperatingHours?.Datetime || '';
+    const odometer = u.Distance?.Odometer;
+
+    // Cost per hour
+    const purchase = purchaseData[uid];
+    let costPerHr = '—';
+    if (purchase && hours && hours > 0) {
+      const totalCost = purchase.price + (unit.cum5 || 0);
+      costPerHr = '$' + (totalCost / hours).toFixed(2) + '/hr';
+    }
+
+    // Hours flag
+    const threshold = econLifeHours[unit.cls] || 10000;
+    const pctLife = hours ? Math.round((hours / threshold) * 100) : 0;
+    if (hours && pctLife >= 80) {
+      flagged.push({ uid, unit, hours, threshold, pctLife, costPerHr });
+    }
+
+    // Engine status badge
+    const engBadge = running === true
+      ? `<span class="rep-badge optimal">● RUNNING</span>`
+      : running === false
+        ? `<span class="rep-badge" style="background:rgba(100,116,139,0.15);color:var(--text-muted);border:1px solid var(--border);">○ OFF</span>`
+        : `<span style="color:var(--text-muted);font-size:10px;">—</span>`;
+
+    // Hours display
+    const hoursDisplay = hours
+      ? `${hours.toLocaleString()} hrs`
+      : `<span style="color:var(--text-muted)">—</span>`;
+
+    // Life % color
+    const lifeColor = pctLife >= 100 ? 'var(--danger)' : pctLife >= 80 ? 'var(--warn)' : 'var(--accent3)';
+    const tcoStatus = hours
+      ? `<span style="color:${lifeColor};font-size:11px;">${pctLife}% life used</span>`
+      : `<span style="color:var(--text-muted);font-size:10px;">No hours data</span>`;
+
+    // Last report time
+    const lastRpt = lastReport
+      ? new Date(lastReport).toLocaleDateString() + ' ' + new Date(lastReport).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+      : '—';
+
+    return `<tr>
+      <td class="equip-name">${uid || header.EquipmentID}</td>
+      <td>${unit.name}</td>
+      <td style="color:var(--text-muted);font-size:11px;">${unit.cls}</td>
+      <td>${engBadge}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;">${hoursDisplay}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;color:var(--accent2);">${costPerHr}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-muted);">${lastRpt}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${odometer ? odometer.toFixed(1) + ' km' : '—'}</td>
+      <td>${tcoStatus}</td>
+    </tr>`;
+  }).join('');
+
+  // Render hours flags
+  renderHoursFlags(flagged);
+}
+
+function renderHoursFlags(flagged) {
+  const panel = document.getElementById('tl-hours-flags-panel');
+  const table = document.getElementById('tl-hours-flags-table');
+  const tbody = document.getElementById('tl-hours-flags-tbody');
+
+  if (!flagged.length) {
+    panel.querySelector('div').textContent = '✓ No units currently exceeding economic life hour thresholds.';
+    table.style.display = 'none';
+    return;
+  }
+
+  panel.querySelector('div').textContent = `${flagged.length} unit${flagged.length>1?'s':''} at or approaching economic life hour threshold:`;
+  table.style.display = 'table';
+
+  tbody.innerHTML = flagged.sort((a,b) => b.pctLife - a.pctLife).map(f => {
+    const badge = f.pctLife >= 100
+      ? `<span class="rep-badge critical">● EXCEEDED</span>`
+      : `<span class="rep-badge monitor">◐ APPROACHING</span>`;
+    return `<tr>
+      <td class="equip-name">${f.uid}</td>
+      <td>${f.unit.name}</td>
+      <td style="color:var(--text-muted)">${f.unit.cls}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;">${f.hours.toLocaleString()} hrs</td>
+      <td style="color:var(--text-muted)">${f.threshold.toLocaleString()} hrs</td>
+      <td style="color:${f.pctLife>=100?'var(--danger)':'var(--warn)'};">${f.pctLife}%</td>
+      <td style="color:var(--accent2);font-family:'IBM Plex Mono',monospace;">${f.costPerHr}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filterTelem(f) {
+  telemFilter = f;
+  ['all','running','hours','idle'].forEach(k => {
+    const btn = document.getElementById('tl-btn-' + k);
+    if (btn) { btn.style.borderColor = k===f ? 'var(--accent2)' : ''; btn.style.color = k===f ? 'var(--accent2)' : ''; }
+  });
+  renderTelematics();
+}
+
+function updateTelemHeader(connected) {
+  const dot = document.getElementById('vl-status-dot');
+  const text = document.getElementById('vl-status-text');
+  const mode = document.getElementById('header-data-mode');
+  if (connected) {
+    dot.className = 'status-dot connected';
+    text.textContent = 'VisionLink: Connected ✓';
+    mode.textContent = 'LIVE + STATIC DATA';
+  } else {
+    dot.className = 'status-dot pending';
+    text.textContent = 'VisionLink: Error';
+  }
+}
+
+function loadCachedTelem() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(TELEM_CACHE_KEY) || 'null');
+    if (cached && cached.data) {
+      telemData = cached.data;
+      renderTelematics();
+      document.getElementById('tl-last-updated').textContent = `Cached: ${new Date(cached.fetchedAt).toLocaleString()}`;
+      updateTelemHeader(true);
+    }
+  } catch(e) {}
+}
+
+// ============================================================
+// ============================================================
+
+// Master roster of all known units (id, name, class, modelYear, 5yr R&M)
+const fleetRoster = [
+  {id:101, name:'Caterpillar 320C', make:'Caterpillar', desc:'320C', cls:'Excavators', yr:2006, serial:'PAB06649', type:'Excavator', cum5:94156, avg:18831},
+  {id:102, name:'Caterpillar 325D', make:'Caterpillar', desc:'325D', cls:'Excavators', yr:2007, serial:'A3R00918', type:'Excavator', cum5:148883, avg:29776},
+  {id:103, name:'Caterpillar 304C CR', make:'Caterpillar', desc:'304C CR', cls:'Excavators', yr:2010, serial:'FPK03728', type:'Excavator', cum5:44467, avg:8893},
+  {id:108, name:'Caterpillar 305.5E CR', make:'Caterpillar', desc:'305.5E CR', cls:'Excavators', yr:2015, serial:'EJX01038', type:'Excavator', cum5:29261, avg:5852},
+  {id:109, name:'Caterpillar 349F', make:'Caterpillar', desc:'349F', cls:'Excavators', yr:2015, serial:'BZ200308', type:'Excavator', cum5:199403, avg:39880},
+  {id:111, name:'Caterpillar 336', make:'Caterpillar', desc:'336', cls:'Excavators', yr:2019, serial:'DKS00437', type:'Excavator', cum5:78696, avg:15739},
+  {id:112, name:'Caterpillar 330', make:'Caterpillar', desc:'330', cls:'Excavators', yr:2022, serial:'WCH20687', type:'Excavator', cum5:45102, avg:9020},
+  {id:113, name:'Hitachi 300L', make:'Hitachi', desc:'300L', cls:'Excavators', yr:2015, serial:'1FFDDP70EGF840122', type:'Excavator', cum5:87739, avg:17547},
+  {id:114, name:'Caterpillar 306', make:'Caterpillar', desc:'306', cls:'Excavators', yr:2022, serial:'6G606526', type:'Excavator', cum5:20228, avg:4045},
+  {id:115, name:'Caterpillar 352', make:'Caterpillar', desc:'352', cls:'Excavators', yr:2023, serial:'KXH00513', type:'Excavator', cum5:52930, avg:10586},
+  {id:116, name:'Caterpillar 315GC', make:'Caterpillar', desc:'315GC', cls:'Excavators', yr:2023, serial:'FTY20519', type:'Excavator', cum5:28819, avg:5763},
+  {id:117, name:'Caterpillar 349FL', make:'Caterpillar', desc:'349FL', cls:'Excavators', yr:2020, serial:'BZ221082', type:'Excavator', cum5:91595, avg:18319},
+  {id:118, name:'Caterpillar 320GC', make:'Caterpillar', desc:'320GC', cls:'Excavators', yr:2019, serial:'KTN10577', type:'Excavator', cum5:14041, avg:2808},
+  {id:119, name:'John Deere 350', make:'John Deere', desc:'350', cls:'Excavators', yr:2014, serial:'810192', type:'Excavator', cum5:20561, avg:4112},
+  {id:120, name:'Caterpillar 302.7', make:'Caterpillar', desc:'302.7', cls:'Excavators', yr:2024, serial:'3X300206', type:'Excavator', cum5:0, avg:0},
+  {id:201, name:'Caterpillar D5G LGP / Open Rops', make:'Caterpillar', desc:'D5G LGP / Open Rops', cls:'Dozers', yr:2004, serial:'RKG00886', type:'Dozer', cum5:45176, avg:9035},
+  {id:202, name:'Caterpillar D5G LGP / Cab', make:'Caterpillar', desc:'D5G LGP / Cab', cls:'Dozers', yr:2005, serial:'FDW01019', type:'Dozer', cum5:96656, avg:19331},
+  {id:206, name:'Caterpillar D6T XW', make:'Caterpillar', desc:'D6T XW', cls:'Dozers', yr:2012, serial:'RCW01150', type:'Dozer', cum5:150288, avg:30057},
+  {id:209, name:'Caterpillar D6T XW', make:'Caterpillar', desc:'D6T XW', cls:'Dozers', yr:2014, serial:'RCW01427', type:'Dozer', cum5:153467, avg:30693},
+  {id:211, name:'Caterpillar D3 LGP', make:'Caterpillar', desc:'D3 LGP', cls:'Dozers', yr:2020, serial:'XKY00259', type:'Dozer', cum5:55189, avg:11037},
+  {id:212, name:'Caterpillar D3 LGP', make:'Caterpillar', desc:'D3 LGP', cls:'Dozers', yr:2020, serial:'XKY00270', type:'Dozer', cum5:72873, avg:14574},
+  {id:214, name:'Caterpillar D3 LGP', make:'Caterpillar', desc:'D3 LGP', cls:'Dozers', yr:2021, serial:'XKY00881', type:'Dozer', cum5:42390, avg:8478},
+  {id:215, name:'Caterpillar D3 LGP', make:'Caterpillar', desc:'D3 LGP', cls:'Dozers', yr:2022, serial:'XKY02769', type:'Dozer', cum5:33330, avg:6666},
+  {id:216, name:'Caterpillar D8L', make:'Caterpillar', desc:'D8L', cls:'Dozers', yr:1984, serial:'53Y02645', type:'Dozer', cum5:79683, avg:15936},
+  {id:217, name:'Caterpillar D4 LGP', make:'Caterpillar', desc:'D4 LGP', cls:'Dozers', yr:2023, serial:'RLT00658', type:'Dozer', cum5:11127, avg:2225},
+  {id:218, name:'Caterpillar D6T XW', make:'Caterpillar', desc:'D6T XW', cls:'Dozers', yr:2014, serial:'RCW01490', type:'Dozer', cum5:68392, avg:13678},
+  {id:219, name:'Caterpillar D4 LGP', make:'Caterpillar', desc:'D4 LGP', cls:'Dozers', yr:2023, serial:'RLT00795', type:'Dozer', cum5:19484, avg:3896},
+  {id:220, name:'Caterpillar D4 LGP', make:'Caterpillar', desc:'D4 LGP', cls:'Dozers', yr:2025, serial:'RLT12429', type:'Dozer', cum5:10785, avg:2157},
+  {id:221, name:'Caterpillar D4 LGP', make:'Caterpillar', desc:'D4 LGP', cls:'Dozers', yr:2025, serial:'RLT12682', type:'Dozer', cum5:440, avg:88},
+  {id:222, name:'Caterpillar D2 LGP', make:'Caterpillar', desc:'D2 LGP', cls:'Dozers', yr:2025, serial:'XKR04745', type:'Dozer', cum5:782, avg:156},
+  {id:223, name:'Komatsu D61PX', make:'Komatsu', desc:'D61PX', cls:'Dozers', yr:2025, serial:'48159', type:'Dozer', cum5:0, avg:0},
+  {id:301, name:'Caterpillar 268B', make:'Caterpillar', desc:'268B', cls:'Compaction/Loaders', yr:2006, serial:'LBA01563/844674', type:'Skidsteer', cum5:36961, avg:7392},
+  {id:305, name:'Caterpillar IT28G - Wilmer', make:'Caterpillar', desc:'IT28G - Wilmer', cls:'Compaction/Loaders', yr:1997, serial:'8CR00437', type:'Loader', cum5:49500, avg:9900},
+  {id:307, name:'Caterpillar 299D2', make:'Caterpillar', desc:'299D2', cls:'Compaction/Loaders', yr:2018, serial:'DX203277', type:'Skidsteer', cum5:75873, avg:15174},
+  {id:308, name:'Caterpillar 289D3', make:'Caterpillar', desc:'289D3', cls:'Compaction/Loaders', yr:2022, serial:'JX908962', type:'Skidsteer', cum5:14520, avg:2904},
+  {id:309, name:'John Deere 544J - Yard', make:'John Deere', desc:'544J - Yard', cls:'Compaction/Loaders', yr:2004, serial:'DW544JT592919', type:'Loader', cum5:38180, avg:7636},
+  {id:310, name:'Caterpillar IT28G - Federico', make:'Caterpillar', desc:'IT28G - Federico', cls:'Compaction/Loaders', yr:2000, serial:'8CR02302', type:'Loader', cum5:24911, avg:4982},
+  {id:311, name:'Caterpillar IT28G - Remedios', make:'Caterpillar', desc:'IT28G - Remedios', cls:'Compaction/Loaders', yr:2001, serial:'8CR02936', type:'Loader', cum5:18972, avg:3794},
+  {id:312, name:'Caterpillar 299D3', make:'Caterpillar', desc:'299D3', cls:'Compaction/Loaders', yr:2020, serial:'DY901304', type:'Skidsteer', cum5:11778, avg:2355},
+  {id:313, name:'Caterpillar 275', make:'Caterpillar', desc:'275', cls:'Compaction/Loaders', yr:2025, serial:'ZE801266', type:'Skidsteer', cum5:3374, avg:674},
+  {id:314, name:'Caterpillar 938M QC - Abner', make:'Caterpillar', desc:'938M QC - Abner', cls:'Compaction/Loaders', yr:2019, serial:'J3R08225', type:'Loader', cum5:0, avg:0},
+  {id:315, name:'Caterpillar 938M QC - Max', make:'Caterpillar', desc:'938M QC - Max', cls:'Compaction/Loaders', yr:2023, serial:'J3R10274', type:'Loader', cum5:0, avg:0},
+  {id:401, name:'Bomag BW213DH 84 Padfoot/shell', make:'Bomag', desc:'BW213DH 84 Padfoot/shell', cls:'Rollers/Compactors', yr:2011, serial:'901582561147', type:'Roller', cum5:71171, avg:14234},
+  {id:402, name:'Ingersoll Rand SD100F 84 Padfoot', make:'Ingersoll Rand', desc:'SD100F 84 Padfoot', cls:'Rollers/Compactors', yr:1990, serial:'7440S', type:'Roller', cum5:18969, avg:3793},
+  {id:403, name:'Caterpillar CS423E Padfoot/shell', make:'Caterpillar', desc:'CS423E Padfoot/shell', cls:'Rollers/Compactors', yr:2005, serial:'BWG00168', type:'Roller', cum5:29398, avg:5879},
+  {id:404, name:'Caterpillar CP433E Padfoot', make:'Caterpillar', desc:'CP433E Padfoot', cls:'Rollers/Compactors', yr:2005, serial:'ASN00445', type:'Roller', cum5:20420, avg:4084},
+  {id:406, name:'Sakai SV400T 66 Smooth/shell', make:'Sakai', desc:'SV400T 66 Smooth/shell', cls:'Rollers/Compactors', yr:2007, serial:'VSV15-30259', type:'Roller', cum5:14498, avg:2899},
+  {id:409, name:'Sakai SV505D 84 Smooth/shell', make:'Sakai', desc:'SV505D 84 Smooth/shell', cls:'Rollers/Compactors', yr:2011, serial:'VSV160-60119', type:'Roller', cum5:15806, avg:3161},
+  {id:412, name:'Sakai SV544T 84 Padfoot', make:'Sakai', desc:'SV544T 84 Padfoot', cls:'Rollers/Compactors', yr:2019, serial:'10235', type:'Roller', cum5:36392, avg:7278},
+  {id:413, name:'Sakai SV505T 84 Padfoot', make:'Sakai', desc:'SV505T 84 Padfoot', cls:'Rollers/Compactors', yr:2006, serial:'VSV16-40280', type:'Roller', cum5:41203, avg:8240},
+  {id:414, name:'Caterpillar 815B Padfoot', make:'Caterpillar', desc:'815B Padfoot', cls:'Rollers/Compactors', yr:1988, serial:'17Z00922', type:'Roller', cum5:13166, avg:2633},
+  {id:415, name:'Hamm H71 VIB 66 Smooth', make:'Hamm', desc:'H71 VIB 66 Smooth', cls:'Rollers/Compactors', yr:2016, serial:'H2220896', type:'Roller', cum5:7099, avg:1419},
+  {id:416, name:'Caterpillar CP-56B 84 Padfoot Bluelight', make:'Caterpillar', desc:'CP-56B 84 Padfoot Bluelight', cls:'Support/Misc', yr:2017, serial:'P5600314', type:'Roller', cum5:55791, avg:11158},
+  {id:417, name:'Caterpillar CS-54B 84 Smooth Bluelight', make:'Caterpillar', desc:'CS-54B 84 Smooth Bluelight', cls:'Support/Misc', yr:2020, serial:'CS501051', type:'Roller', cum5:4274, avg:854},
+  {id:418, name:'Hamm H71 VIB 66 Smooth', make:'Hamm', desc:'H71 VIB 66 Smooth', cls:'Rollers/Compactors', yr:2000, serial:'WGHOH270JHAA00210', type:'Roller', cum5:1608, avg:321},
+  {id:419, name:'Sakai SV544T 84 Padfoot', make:'Sakai', desc:'SV544T 84 Padfoot', cls:'Rollers/Compactors', yr:2025, serial:'3SV56-11060', type:'Roller', cum5:0, avg:0},
+  {id:420, name:'Sakai SV544T 84 Padfoot', make:'Sakai', desc:'SV544T 84 Padfoot', cls:'Rollers/Compactors', yr:2025, serial:'3SV56-11061', type:'Roller', cum5:0, avg:0},
+  {id:501, name:'Caterpillar 725 Water Wagon', make:'Caterpillar', desc:'725 Water Wagon', cls:'Articulated Trucks', yr:2004, serial:'AFX01207', type:'Water Wagon', cum5:109900, avg:21980},
+  {id:502, name:'Caterpillar 725C', make:'Caterpillar', desc:'725C', cls:'Articulated Trucks', yr:2015, serial:'TFB00377', type:'ADT', cum5:96999, avg:19399},
+  {id:503, name:'Caterpillar 725C', make:'Caterpillar', desc:'725C', cls:'Articulated Trucks', yr:2015, serial:'TFB00407', type:'ADT', cum5:56531, avg:11306},
+  {id:504, name:'Caterpillar 725C', make:'Caterpillar', desc:'725C', cls:'Articulated Trucks', yr:2015, serial:'TFB00327', type:'ADT', cum5:87854, avg:17570},
+  {id:510, name:'Caterpillar 740', make:'Caterpillar', desc:'740', cls:'Articulated Trucks', yr:2008, serial:'B1P03121', type:'ADT', cum5:194150, avg:38830},
+  {id:512, name:'Caterpillar 740GC', make:'Caterpillar', desc:'740GC', cls:'Articulated Trucks', yr:2024, serial:'3T805963', type:'ADT', cum5:32796, avg:6559},
+  {id:513, name:'Caterpillar 740GC', make:'Caterpillar', desc:'740GC', cls:'Articulated Trucks', yr:2024, serial:'3T805964', type:'ADT', cum5:29450, avg:5890},
+  {id:514, name:'Caterpillar 740GC', make:'Caterpillar', desc:'740GC', cls:'Articulated Trucks', yr:2025, serial:'3T806585', type:'ADT', cum5:330, avg:66},
+  {id:515, name:'Caterpillar 740GC', make:'Caterpillar', desc:'740GC', cls:'Articulated Trucks', yr:2025, serial:'3T806627', type:'ADT', cum5:687, avg:137},
+  {id:516, name:'Caterpillar 740GC', make:'Caterpillar', desc:'740GC', cls:'Articulated Trucks', yr:2025, serial:'3T806553', type:'ADT', cum5:440, avg:88},
+  {id:601, name:'John Deere 6140D', make:'John Deere', desc:'6140D', cls:'Support/Misc', yr:2012, serial:'1P06140DPCH020782', type:'Tractor', cum5:18526, avg:3705},
+  {id:602, name:'Frontier DH5110 Offset Disc (6140D)', make:'Frontier', desc:'DH5110 Offset Disc (6140D)', cls:'Support/Misc', yr:2020, serial:'1XFDH51XCL0000177', type:'Disc', cum5:1307, avg:261},
+  {id:603, name:'Holmes Rollerblade A02798', make:'Holmes', desc:'Rollerblade A02798', cls:'Support/Misc', yr:2020, serial:'RB11F836', type:'Rollerblade', cum5:820, avg:164},
+  {id:604, name:'Caterpillar Challenger 965C', make:'Caterpillar', desc:'Challenger 965C', cls:'Support/Misc', yr:2013, serial:'AGCC0965HDNTF1036', type:'Tractor', cum5:71527, avg:14305},
+  {id:605, name:'K-Tec 2016 Land Leveler', make:'K-Tec', desc:'2016 Land Leveler', cls:'Support/Misc', yr:2021, serial:'KL1080', type:'Box Blade', cum5:1326, avg:265},
+  {id:606, name:'K-Tec 1228 Scraper', make:'K-Tec', desc:'1228 Scraper', cls:'Support/Misc', yr:2018, serial:'8811228', type:'Scraper', cum5:472, avg:94},
+  {id:607, name:'Caterpillar 12H', make:'Caterpillar', desc:'12H', cls:'Support/Misc', yr:2006, serial:'0AMZ01102', type:'Grader', cum5:8222, avg:1644},
+  {id:608, name:'Caterpillar Challenger 45', make:'Caterpillar', desc:'Challenger 45', cls:'Support/Misc', yr:1995, serial:'1DR00741', type:'Track Tractor', cum5:60110, avg:12022},
+  {id:705, name:'Bomag BMP8500 Trench Roller w/ Econ.', make:'Bomag', desc:'BMP8500 Trench Roller w/ Econ.', cls:'Compaction/Loaders', yr:2017, serial:'101720126243', type:'Trench Roller', cum5:0, avg:0},
+  {id:707, name:'Bomag BMP8500 Trench Roller', make:'Bomag', desc:'BMP8500 Trench Roller', cls:'Compaction/Loaders', yr:2013, serial:'101720121405', type:'Trench Roller', cum5:0, avg:0},
+  {id:708, name:'Bomag BT65 Tamp', make:'Bomag', desc:'BT65 Tamp', cls:'Compaction/Loaders', yr:2018, serial:'101541353538', type:'Jumping Jack', cum5:0, avg:0},
+  {id:709, name:'Wacker BS50-2I Tamp', make:'Wacker', desc:'BS50-2I Tamp', cls:'Compaction/Loaders', yr:2015, serial:'24240331', type:'Jumping Jack', cum5:0, avg:0},
+  {id:710, name:'Wacker BS50-2I Tamp', make:'Wacker', desc:'BS50-2I Tamp', cls:'Compaction/Loaders', yr:2017, serial:'24393731', type:'Jumping Jack', cum5:0, avg:0},
+  {id:711, name:'Wacker Plate Tamp 1550 AW 7576', make:'Wacker', desc:'Plate Tamp 1550 AW 7576', cls:'Compaction/Loaders', yr:2013, serial:'30027070', type:'PlateTamp', cum5:0, avg:0},
+  {id:712, name:'Wacker 2 Water Pump', make:'Wacker', desc:'2 Water Pump', cls:'Support/Misc', yr:2000, serial:'844167', type:'Pump', cum5:0, avg:0},
+  {id:713, name:'Wacker 3 Water Pump', make:'Wacker', desc:'3 Water Pump', cls:'Support/Misc', yr:2000, serial:'5926210', type:'Pump', cum5:0, avg:0},
+  {id:714, name:'Ver-Mac Arrowboard ST-4X8', make:'Ver-Mac', desc:'Arrowboard ST-4X8', cls:'Support/Misc', yr:2011, serial:'2S9US2112BS132247', type:'Arrowboard', cum5:0, avg:0},
+  {id:715, name:'Sullair Model 185 JD', make:'Sullair', desc:'Model 185 JD', cls:'Support/Misc', yr:2007, serial:'200706150104', type:'Air Compressor', cum5:0, avg:0},
+  {id:716, name:'Western Snow Plow - 8.5', make:'Western', desc:'Snow Plow - 8.5', cls:'Support/Misc', yr:2000, serial:'', type:'Plow', cum5:0, avg:0},
+  {id:718, name:'John Deere MX15 Rotary Cutter', make:'John Deere', desc:'MX15 Rotary Cutter', cls:'Support/Misc', yr:2018, serial:'P0MX15EVHP011136', type:'Mower', cum5:0, avg:0},
+  {id:719, name:'Atlas Copco Air Compressor', make:'Atlas Copco', desc:'Air Compressor', cls:'Support/Misc', yr:2011, serial:'HOP037654', type:'Air Compressor', cum5:0, avg:0},
+  {id:721, name:'MHS MHS-0810 8X10 Manhole Box', make:'MHS', desc:'MHS-0810 8X10 Manhole Box', cls:'Support/Misc', yr:2018, serial:'18-2638', type:'Manhole Box', cum5:0, avg:0},
+  {id:722, name:'MHS 8x24 Trench Box', make:'MHS', desc:'8x24 Trench Box', cls:'Support/Misc', yr:2013, serial:'146076', type:'Trench Box', cum5:0, avg:0},
+  {id:723, name:'Wacker BS50-2I', make:'Wacker', desc:'BS50-2I', cls:'Compaction/Loaders', yr:2018, serial:'24408661', type:'Jumping Jack', cum5:0, avg:0},
+  {id:724, name:'Xtreme XBC60LF Brush Mower', make:'Xtreme', desc:'XBC60LF Brush Mower', cls:'Support/Misc', yr:2015, serial:'75634', type:'Mower', cum5:0, avg:0},
+  {id:725, name:'Wacker Plate Tamp 1550 AW', make:'Wacker', desc:'Plate Tamp 1550 AW', cls:'Compaction/Loaders', yr:2019, serial:'10933437', type:'PlateTamp', cum5:0, avg:0},
+  {id:726, name:'4 Gorman-Rup 4in Water Pump PA4A60-4045D', make:'4 Gorman-Rup', desc:'4in Water Pump PA4A60-4045D', cls:'Support/Misc', yr:2007, serial:'1366234N', type:'Water Pump', cum5:0, avg:0},
+  {id:727, name:'Bomag BMP8500 Trench Roller', make:'Bomag', desc:'BMP8500 Trench Roller', cls:'Compaction/Loaders', yr:2021, serial:'101720136323', type:'Trench Roller', cum5:0, avg:0},
+  {id:728, name:'Bomag BMP8500 Trench Roller', make:'Bomag', desc:'BMP8500 Trench Roller', cls:'Compaction/Loaders', yr:2021, serial:'101720135941', type:'Trench Roller', cum5:0, avg:0},
+  {id:729, name:'Montabert SC 28 Hammer', make:'Montabert', desc:'SC 28 Hammer', cls:'Support/Misc', yr:2022, serial:'A00Y29779', type:'Hammer', cum5:0, avg:0},
+  {id:730, name:'Norton Clipper Saw C-116 walk behind concrete saw', make:'Norton Clipper Saw', desc:'C-116 walk behind concrete saw', cls:'Support/Misc', yr:2000, serial:'90JM6726601601', type:'Concrete saw', cum5:0, avg:0},
+  {id:731, name:'Caterpillar GB 124 Grader Blade [Skid Steer]', make:'Caterpillar', desc:'GB 124 Grader Blade [Skid Steer]', cls:'Support/Misc', yr:2022, serial:'K4B00727', type:'6 way Blade', cum5:0, avg:0},
+  {id:732, name:'Caterpilliar Angle / DozerBlade', make:'Caterpilliar', desc:'Angle / DozerBlade', cls:'Support/Misc', yr:2016, serial:'A4161BD30007', type:'6 way blade', cum5:0, avg:0},
+  {id:733, name:'Blue Diamond Mower Attachment', make:'Blue Diamond', desc:'Mower Attachment', cls:'Support/Misc', yr:2022, serial:'138508', type:'Model 800050', cum5:0, avg:0},
+  {id:734, name:'Atlas Copco Breaker/Hammer', make:'Atlas Copco', desc:'Breaker/Hammer', cls:'Support/Misc', yr:2000, serial:'3078', type:'HB2200', cum5:0, avg:0},
+  {id:735, name:'Wacker Plate Tamp', make:'Wacker', desc:'Plate Tamp', cls:'Compaction/Loaders', yr:2022, serial:'5100009658 / 11618161', type:'BPU5545A / Plate Tamp', cum5:0, avg:0},
+  {id:737, name:'Vermeer Evacuator(vac trailer)', make:'Vermeer', desc:'Evacuator(vac trailer)', cls:'Support/Misc', yr:2001, serial:'1VRT2029111000314', type:'E 550', cum5:0, avg:0},
+  {id:738, name:'Honda Pioneer 1000M5DJA', make:'Honda', desc:'Pioneer 1000M5DJA', cls:'Support/Misc', yr:2015, serial:'1HFVE042XJ4202685', type:'SXS(side by side)', cum5:0, avg:0},
+  {id:740, name:'MB MB-R900', make:'MB', desc:'MB-R900', cls:'Support/Misc', yr:2023, serial:'1950', type:'Drum Cutter', cum5:0, avg:0},
+  {id:741, name:'6 Pioneer Pump PP66S12L714045', make:'6 Pioneer Pump', desc:'PP66S12L714045', cls:'Support/Misc', yr:2013, serial:'PP21730', type:'6 Water Pump', cum5:0, avg:0},
+  {id:742, name:'Club Car CARRYALL 1700', make:'Club Car', desc:'CARRYALL 1700', cls:'Support/Misc', yr:2017, serial:'SD1813860222', type:'UTV 4WD DSL', cum5:0, avg:0},
+  {id:743, name:'Fecon Mulching Head', make:'Fecon', desc:'Mulching Head', cls:'Support/Misc', yr:2000, serial:'00BH074014604', type:'Mulching Head Attachement', cum5:0, avg:0},
+  {id:744, name:'Southern Implement Grapple Bucket', make:'Southern Implement', desc:'Grapple Bucket', cls:'Support/Misc', yr:2019, serial:'272078-C3', type:'72 Grapple Bucket', cum5:0, avg:0},
+  {id:745, name:'SS Bushhog 72 Bushhog', make:'SS Bushhog', desc:'72 Bushhog', cls:'Support/Misc', yr:2019, serial:'178162 D3', type:'Skidsteer bushhog', cum5:0, avg:0},
+  {id:746, name:'CAT GP Bucket', make:'CAT', desc:'GP Bucket', cls:'Support/Misc', yr:2019, serial:'A4201BC20054', type:'General Purpose Bucket', cum5:0, avg:0},
+  {id:748, name:'Skyjack Scissor Lift 19 Electric', make:'Skyjack', desc:'Scissor Lift 19 Electric', cls:'Support/Misc', yr:2015, serial:'220739.55', type:'Model SJIII3219', cum5:0, avg:0},
+  {id:749, name:'C I D Angle Broom ( Skid Steer )', make:'C I D', desc:'Angle Broom ( Skid Steer )', cls:'Support/Misc', yr:2014, serial:'', type:'Brush Part # CID 9275', cum5:0, avg:0},
+  {id:750, name:'Club Car CARRYALL 1700', make:'Club Car', desc:'CARRYALL 1700', cls:'Support/Misc', yr:2017, serial:'SD1813860219', type:'UTV 4WD DSL', cum5:0, avg:0},
+  {id:751, name:'Bed Rock 349E Ripper', make:'Bed Rock', desc:'349E Ripper', cls:'Support/Misc', yr:2024, serial:'3340505B3019P', type:'Ripper Attachment', cum5:0, avg:0},
+  {id:752, name:'McElroy Electrofusion Welder', make:'McElroy', desc:'Electrofusion Welder', cls:'Support/Misc', yr:2024, serial:'', type:'HDPE Welder', cum5:0, avg:0},
+  {id:753, name:'McElroy Pitbull 1-4 Welder', make:'McElroy', desc:'Pitbull 1-4 Welder', cls:'Support/Misc', yr:2024, serial:'', type:'HDPE Welder', cum5:0, avg:0},
+  {id:754, name:'McElroy T28 Wheels Welder', make:'McElroy', desc:'T28 Wheels Welder', cls:'Support/Misc', yr:2024, serial:'', type:'HDPE Welder', cum5:0, avg:0},
+  {id:755, name:'McElroy DynaMC 28 Welder', make:'McElroy', desc:'DynaMC 28 Welder', cls:'Support/Misc', yr:2024, serial:'', type:'HDPE Welder', cum5:0, avg:0},
+  {id:756, name:'LAY-MOR SM300', make:'LAY-MOR', desc:'SM300', cls:'Support/Misc', yr:2017, serial:'37664', type:'3 Wheel Broom', cum5:0, avg:0},
+  {id:757, name:'Wacker LTV6K Light Plant / Generator 6KW', make:'Wacker', desc:'LTV6K Light Plant / Generator 6KW', cls:'Support/Misc', yr:2000, serial:'WNCLTV02TPUM01190', type:'Portable Light Plant', cum5:0, avg:0},
+  {id:759, name:'Ammann ATR68P Jumpiong Jack Tamp', make:'Ammann', desc:'ATR68P Jumpiong Jack Tamp', cls:'Compaction/Loaders', yr:2024, serial:'3074805', type:'Tamp/Jumping Jack', cum5:0, avg:0},
+  {id:760, name:'Denis Cimaf 180D Mulching Head', make:'Denis Cimaf', desc:'180D Mulching Head', cls:'Support/Misc', yr:2025, serial:'DAF-180D25097', type:'Mulching Head Attachement', cum5:0, avg:0},
+  {id:761, name:'Multiquip MTX-60HD', make:'Multiquip', desc:'MTX-60HD', cls:'Compaction/Loaders', yr:2025, serial:'L13132', type:'Jumping Jack', cum5:0, avg:0},
+  {id:762, name:'Multiquip MTX-60HD', make:'Multiquip', desc:'MTX-60HD', cls:'Compaction/Loaders', yr:2025, serial:'L13134', type:'Jumping Jack', cum5:0, avg:0},
+  {id:763, name:'Multiquip MTX-60HD', make:'Multiquip', desc:'MTX-60HD', cls:'Compaction/Loaders', yr:2025, serial:'L13281', type:'Jumping Jack', cum5:0, avg:0},
+  {id:764, name:'Multiquip MTX-60HD', make:'Multiquip', desc:'MTX-60HD', cls:'Compaction/Loaders', yr:2025, serial:'L13284', type:'Jumping Jack', cum5:0, avg:0},
+  {id:765, name:'Wacker RT-SC4', make:'Wacker', desc:'RT-SC4', cls:'Compaction/Loaders', yr:2025, serial:'WNMR0301VM0001408*', type:'Trench Roller', cum5:0, avg:0},
+  {id:766, name:'Multiquip MTX-60HD', make:'Multiquip', desc:'MTX-60HD', cls:'Compaction/Loaders', yr:2025, serial:'L14663', type:'Jumping Jack', cum5:0, avg:0},
+  {id:767, name:'Connex Box 10 Grease Conex No.1', make:'Connex Box 10', desc:'Grease Conex No.1', cls:'Support/Misc', yr:2023, serial:'CDDU904068-5', type:'Connex Box 10', cum5:0, avg:0},
+  {id:768, name:'Connex Box 10 Grease Connex No. 2', make:'Connex Box 10', desc:'Grease Connex No. 2', cls:'Support/Misc', yr:2025, serial:'', type:'Connex Box 10', cum5:0, avg:0},
+  {id:769, name:'Connex Box 10 Grease Connex No. 3', make:'Connex Box 10', desc:'Grease Connex No. 3', cls:'Support/Misc', yr:2025, serial:'', type:'Connex Box 10', cum5:0, avg:0},
+  {id:770, name:'Polaris Pro XD400', make:'Polaris', desc:'Pro XD400', cls:'Support/Misc', yr:2021, serial:'4XABEPD42M8509263', type:'Buggy', cum5:0, avg:0},
+  {id:801, name:'Chevrolet 1500 - Spare', make:'Chevrolet', desc:'1500 - Spare', cls:'Trucks/Vehicles', yr:2014, serial:'3GCUKSEC9EG458794', type:'Truck', cum5:0, avg:0},
+  {id:803, name:'Chevrolet 1500 - Spare', make:'Chevrolet', desc:'1500 - Spare', cls:'Trucks/Vehicles', yr:2014, serial:'1GCVKPECXEZ359161', type:'Truck', cum5:0, avg:0},
+  {id:805, name:'Chevrolet 2500 - Spare', make:'Chevrolet', desc:'2500 - Spare', cls:'Trucks/Vehicles', yr:2015, serial:'1GC2KUEG0FZ129814', type:'Truck', cum5:0, avg:0},
+  {id:809, name:'Ford F250 - Gold', make:'Ford', desc:'F250 - Gold', cls:'Trucks/Vehicles', yr:2000, serial:'1FTNW21F4YEA87175', type:'Truck', cum5:0, avg:0},
+  {id:810, name:'Ford F250 - Red 2WD Long', make:'Ford', desc:'F250 - Red 2WD Long', cls:'Trucks/Vehicles', yr:2001, serial:'1FTNW20F31EB64948', type:'Truck', cum5:0, avg:0},
+  {id:812, name:'Dodge 2500 - Gray', make:'Dodge', desc:'2500 - Gray', cls:'Trucks/Vehicles', yr:1990, serial:'1B7KM2689LS660861', type:'Truck', cum5:0, avg:0},
+  {id:814, name:'Mack RD690 Tandem Dump', make:'Mack', desc:'RD690 Tandem Dump', cls:'Trucks/Vehicles', yr:1996, serial:'1M2P264C9TM021888', type:'Dump Truck', cum5:0, avg:0},
+  {id:816, name:'Kenworth W900B Tandem Road Tractor', make:'Kenworth', desc:'W900B Tandem Road Tractor', cls:'Trucks/Vehicles', yr:1985, serial:'1XKWDB9X8FS326186', type:'Truck Tractor', cum5:0, avg:0},
+  {id:817, name:'Peterbilt 567 Quad Dump', make:'Peterbilt', desc:'567 Quad Dump', cls:'Trucks/Vehicles', yr:2019, serial:'1NPCL4EX6KD603928', type:'Dump Truck', cum5:0, avg:0},
+  {id:819, name:'Dodge 3500 - William', make:'Dodge', desc:'3500 - William', cls:'Trucks/Vehicles', yr:2019, serial:'3C7WR9CL8KG648505', type:'Truck', cum5:0, avg:0},
+  {id:820, name:'GMC 2500 - Brad', make:'GMC', desc:'2500 - Brad', cls:'Trucks/Vehicles', yr:2019, serial:'1GT12REY3KF245702', type:'Truck', cum5:0, avg:0},
+  {id:821, name:'Chevrolet 1500 LTZ - JR', make:'Chevrolet', desc:'1500 LTZ - JR', cls:'Trucks/Vehicles', yr:2017, serial:'3GCUKSECXHG207030', type:'Truck', cum5:0, avg:0},
+  {id:822, name:'Chevrolet 1500 Z71 - Brady', make:'Chevrolet', desc:'1500 Z71 - Brady', cls:'Trucks/Vehicles', yr:2018, serial:'3GCUKREC4JG223271', type:'Truck', cum5:0, avg:0},
+  {id:823, name:'International Fuel Truck - UNLICENSED', make:'International', desc:'Fuel Truck - UNLICENSED', cls:'Trucks/Vehicles', yr:1987, serial:'1HTLCCFN9HH494416', type:'Truck', cum5:0, avg:0},
+  {id:824, name:'Ford F250 - Burgundy 4WD Short', make:'Ford', desc:'F250 - Burgundy 4WD Short', cls:'Trucks/Vehicles', yr:2001, serial:'1FTNW21F11ED18992', type:'Truck', cum5:0, avg:0},
+  {id:826, name:'Chevrolet 3500 Utility / Abner', make:'Chevrolet', desc:'3500 Utility / Abner', cls:'Trucks/Vehicles', yr:2021, serial:'1GB4YSEYXMF203702', type:'Truck', cum5:0, avg:0},
+  {id:827, name:'Dodge 5500 - Texas Body', make:'Dodge', desc:'5500 - Texas Body', cls:'Trucks/Vehicles', yr:2015, serial:'3C7WRNEL8FG508451', type:'Truck', cum5:0, avg:0},
+  {id:828, name:'Chevrolet 1500-LT-Aaron', make:'Chevrolet', desc:'1500-LT-Aaron', cls:'Trucks/Vehicles', yr:2021, serial:'1GCUYDED3MZ453544', type:'Truck', cum5:0, avg:0},
+  {id:829, name:'Chevrolet 1500 Silverado RST / Federico', make:'Chevrolet', desc:'1500 Silverado RST / Federico', cls:'Trucks/Vehicles', yr:2022, serial:'3GCUYEFD7NG214280', type:'Truck', cum5:0, avg:0},
+  {id:830, name:'GMC 1500 Sierra Limited SLT - Jake', make:'GMC', desc:'1500 Sierra Limited SLT - Jake', cls:'Trucks/Vehicles', yr:2022, serial:'3GTU9DED8NG210942', type:'Truck', cum5:0, avg:0},
+  {id:831, name:'Kenworth T880 Triaxle', make:'Kenworth', desc:'T880 Triaxle', cls:'Trucks/Vehicles', yr:2019, serial:'1XKZP4TX3KJ249624', type:'Truck Tractor', cum5:0, avg:0},
+  {id:832, name:'Kenworth T880 Rollback', make:'Kenworth', desc:'T880 Rollback', cls:'Trucks/Vehicles', yr:2020, serial:'1NKZL40X8LJ385551', type:'Truck', cum5:0, avg:0},
+  {id:833, name:'Chevrolet 3500 - utility - Max', make:'Chevrolet', desc:'3500 - utility - Max', cls:'Trucks/Vehicles', yr:2023, serial:'1GD49TEY0PF158624', type:'Truck', cum5:0, avg:0},
+  {id:834, name:'Chevrolet Express 3500 Van', make:'Chevrolet', desc:'Express 3500 Van', cls:'Trucks/Vehicles', yr:2020, serial:'1GAZGPFG4L1152113', type:'Passenger Van', cum5:0, avg:0},
+  {id:835, name:'Ford F750 Water Truck', make:'Ford', desc:'F750 Water Truck', cls:'Trucks/Vehicles', yr:2017, serial:'1FDNF7AY3HDB07559', type:'Water Truck (On Road)', cum5:0, avg:0},
+  {id:836, name:'International CV515 Crane Truck', make:'International', desc:'CV515 Crane Truck', cls:'Trucks/Vehicles', yr:2024, serial:'1HTKTSWM4RH602424', type:'Mechanics Truck', cum5:0, avg:0},
+  {id:837, name:'Ford F550 / CM Body', make:'Ford', desc:'F550 / CM Body', cls:'Trucks/Vehicles', yr:2024, serial:'1FD0X5HTXREF85494', type:'Flatbed Truck', cum5:0, avg:0},
+  {id:838, name:'Ford F350 SRW Gas - Panfilo', make:'Ford', desc:'F350 SRW Gas - Panfilo', cls:'Trucks/Vehicles', yr:2025, serial:'1FD8W3FN6SED71929', type:'Truck', cum5:0, avg:0},
+  {id:839, name:'Ford F350 SRW Diesel - Bobby', make:'Ford', desc:'F350 SRW Diesel - Bobby', cls:'Trucks/Vehicles', yr:2025, serial:'1FT8W3BT7TEC39076', type:'Truck', cum5:0, avg:0},
+  {id:901, name:'Ledwell Hydratail Trailer', make:'Ledwell', desc:'Hydratail Trailer', cls:'Trailers', yr:2007, serial:'1L9GA72A17L033229', type:'Trailer', cum5:0, avg:0},
+  {id:902, name:'Proline Trailer', make:'Proline', desc:'Trailer', cls:'Trailers', yr:2005, serial:'5SPLS16265W000037', type:'Trailer', cum5:0, avg:0},
+  {id:903, name:'Contrail Trailer / Abner', make:'Contrail', desc:'Trailer / Abner', cls:'Trailers', yr:2006, serial:'4KNUC16256L161580', type:'Trailer', cum5:0, avg:0},
+  {id:904, name:'Kaufman Flatbed Trailer', make:'Kaufman', desc:'Flatbed Trailer', cls:'Trailers', yr:2013, serial:'5VGFP2322DL002319', type:'Trailer', cum5:0, avg:0},
+  {id:905, name:'Kaufman Dump Trailer', make:'Kaufman', desc:'Dump Trailer', cls:'Trailers', yr:2015, serial:'5VGFX1425FL002424', type:'Trailer', cum5:0, avg:0},
+  {id:906, name:'Heartland Service Trailer 1', make:'Heartland', desc:'Service Trailer 1', cls:'Trailers', yr:2015, serial:'430UN1211FM045979', type:'Trailer', cum5:0, avg:0},
+  {id:909, name:'Trailking TK110 HDG Lowboy', make:'Trailking', desc:'TK110 HDG Lowboy', cls:'Trailers', yr:2015, serial:'1TKJ05235FM126275', type:'Trailer', cum5:0, avg:0},
+  {id:910, name:'Kaufman Enclosed Trailer / Abner', make:'Kaufman', desc:'Enclosed Trailer / Abner', cls:'Trailers', yr:2020, serial:'5VGEN122XLL001320', type:'Trailer', cum5:0, avg:0},
+  {id:911, name:'Featherlite Aluminum ATV Trailer', make:'Featherlite', desc:'Aluminum ATV Trailer', cls:'Trailers', yr:2013, serial:'4FGA51215DC126211', type:'Trailer', cum5:0, avg:0},
+  {id:914, name:'Proline Trailer / Gooseneck for Dodge', make:'Proline', desc:'Trailer / Gooseneck for Dodge', cls:'Trailers', yr:2015, serial:'5SPGA3021FW100234', type:'Trailer', cum5:0, avg:0},
+  {id:917, name:'Kaufman Goose Neck Trailer (38K) for Ford', make:'Kaufman', desc:'Goose Neck Trailer (38K) for Ford', cls:'Trailers', yr:2023, serial:'7UZFH352XPL001268', type:'Trailer', cum5:0, avg:0},
+  {id:919, name:'Vision 7 x 14 Enclosed Trailer Welding', make:'Vision', desc:'7 x 14 Enclosed Trailer Welding', cls:'Trailers', yr:2025, serial:'7HJ1E1425SR000980', type:'Fusion Equip. Trailer', cum5:0, avg:0},
+  {id:920, name:'Vision 6 x 12 Enclosed Trailer', make:'Vision', desc:'6 x 12 Enclosed Trailer', cls:'Trailers', yr:2022, serial:'7HJ1E1222NR000216', type:'Enclosed Trailer', cum5:0, avg:0},
+  {id:921, name:'Kaufman 22 Tilt Deck Flat Bed Trailer', make:'Kaufman', desc:'22 Tilt Deck Flat Bed Trailer', cls:'Trailers', yr:2025, serial:'7UZFD2221S1010617', type:'FDWT-10K-22D', cum5:0, avg:0},
+  {id:922, name:'Kaufman 22 Tilt Deck Flat Bed Trailer', make:'Kaufman', desc:'22 Tilt Deck Flat Bed Trailer', cls:'Trailers', yr:2026, serial:'7UZFD2220TL004264', type:'FDWT-7K-22D', cum5:0, avg:0}
+];
+const purchaseData = {
+  101: {price:205256.4, date:'2006-09-05', annualDepr:12315.38, bookVal:20525.64, usefulLife:15},
+  102: {price:277145.4, date:'2007-10-22', annualDepr:16628.72, bookVal:27714.54, usefulLife:15},
+  106: {price:70560.0, date:'2017-02-01', annualDepr:6350.4, bookVal:7056.0, usefulLife:10},
+  108: {price:47000.35, date:'2018-01-05', annualDepr:2820.02, bookVal:18800.14, usefulLife:15},
+  109: {price:284812.5, date:'2018-05-18', annualDepr:17088.75, bookVal:113925.0, usefulLife:15},
+  110: {price:241673.93, date:'2020-04-03', annualDepr:21750.65, bookVal:45918.05, usefulLife:10},
+  111: {price:278833.49, date:'2022-01-10', annualDepr:16730.01, bookVal:195183.44, usefulLife:15},
+  112: {price:297546.7, date:'2022-03-31', annualDepr:17852.8, bookVal:226135.49, usefulLife:15},
+  113: {price:189000.0, date:'2022-07-07', annualDepr:11340.0, bookVal:75600.0, usefulLife:15},
+  114: {price:106711.61, date:'2022-07-21', annualDepr:6402.7, bookVal:87503.52, usefulLife:15},
+  115: {price:605610.27, date:'2023-03-01', annualDepr:36336.62, bookVal:532937.04, usefulLife:15},
+  116: {price:250089.65, date:'2023-04-04', annualDepr:15005.38, bookVal:220078.89, usefulLife:15},
+  117: {price:318291.19, date:'2023-07-25', annualDepr:19097.47, bookVal:222803.83, usefulLife:15},
+  118: {price:129233.49, date:'2025-05-27', annualDepr:7754.01, bookVal:82709.43, usefulLife:15},
+  119: {price:104836.88, date:'2025-08-11', annualDepr:6290.21, bookVal:35644.54, usefulLife:15},
+  120: {price:56145.38, date:'2025-12-11', annualDepr:3368.72, bookVal:52776.66, usefulLife:15},
+  206: {price:148800.0, date:'2016-01-19', annualDepr:9565.71, bookVal:24445.71, usefulLife:14},
+  209: {price:262800.0, date:'2017-09-11', annualDepr:16894.29, bookVal:76962.86, usefulLife:14},
+  211: {price:164265.17, date:'2021-01-13', annualDepr:10559.9, bookVal:111465.65, usefulLife:14},
+  212: {price:171715.18, date:'2021-01-13', annualDepr:11038.83, bookVal:116521.01, usefulLife:14},
+  214: {price:236074.78, date:'2021-07-19', annualDepr:15176.24, bookVal:175369.84, usefulLife:14},
+  215: {price:197125.68, date:'2022-06-06', annualDepr:12672.37, bookVal:159108.58, usefulLife:14},
+  216: {price:67950.0, date:'2022-10-10', annualDepr:4368.21, bookVal:6795.0, usefulLife:14},
+  217: {price:284762.5, date:'2022-12-13', annualDepr:18306.16, bookVal:248150.18, usefulLife:14},
+  218: {price:350171.25, date:'2023-01-10', annualDepr:22511.01, bookVal:102550.15, usefulLife:14},
+  219: {price:266683.21, date:'2023-07-25', annualDepr:17143.92, bookVal:232395.37, usefulLife:14},
+  220: {price:231660.0, date:'2025-07-10', annualDepr:14892.43, bookVal:231660.0, usefulLife:14},
+  221: {price:240211.79, date:'2026-01-15', annualDepr:15442.19, bookVal:240211.79, usefulLife:14},
+  222: {price:174543.75, date:'2026-01-13', annualDepr:11220.67, bookVal:174543.75, usefulLife:14},
+  223: {price:403188.14, date:'2026-03-23', annualDepr:25919.24, bookVal:403188.14, usefulLife:14},
+  301: {price:97151.4, date:'2006-11-15', annualDepr:7286.35, bookVal:9715.14, usefulLife:12},
+  306: {price:82276.84, date:'2018-08-03', annualDepr:7404.92, bookVal:8227.68, usefulLife:10},
+  307: {price:75075.0, date:'2020-07-13', annualDepr:5630.62, bookVal:35660.62, usefulLife:12},
+  308: {price:115440.49, date:'2022-04-08', annualDepr:8658.04, bookVal:89466.38, usefulLife:12},
+  309: {price:59000.0, date:'2022-07-07', annualDepr:4425.0, bookVal:5900.0, usefulLife:12},
+  310: {price:37000.0, date:'2023-01-10', annualDepr:2775.0, bookVal:3700.0, usefulLife:12},
+  311: {price:37000.0, date:'2023-01-10', annualDepr:2775.0, bookVal:3700.0, usefulLife:12},
+  312: {price:70000.0, date:'2023-05-04', annualDepr:5250.0, bookVal:43750.0, usefulLife:12},
+  313: {price:192145.88, date:'2025-09-25', annualDepr:14410.94, bookVal:192145.88, usefulLife:12},
+  314: {price:134442.9, date:'2026-02-18', annualDepr:10083.22, bookVal:73943.59, usefulLife:12},
+  315: {price:157785.08, date:'2026-02-19', annualDepr:11833.88, bookVal:134117.32, usefulLife:12},
+  401: {price:63277.5, date:'2017-04-27', annualDepr:3796.65, bookVal:10124.4, usefulLife:15},
+  403: {price:53490.94, date:'2019-01-07', annualDepr:3209.46, bookVal:5349.09, usefulLife:15},
+  404: {price:46921.08, date:'2015-03-19', annualDepr:2815.26, bookVal:4692.11, usefulLife:15},
+  405: {price:47500.0, date:'2017-10-28', annualDepr:4275.0, bookVal:4750.0, usefulLife:10},
+  406: {price:40031.25, date:'2015-02-24', annualDepr:2401.88, bookVal:4003.12, usefulLife:15},
+  409: {price:82743.0, date:'2015-09-04', annualDepr:4964.58, bookVal:13238.88, usefulLife:15},
+  412: {price:62762.5, date:'2021-01-12', annualDepr:3765.75, bookVal:40168.0, usefulLife:15},
+  413: {price:52801.43, date:'2022-03-18', annualDepr:3168.09, bookVal:5280.14, usefulLife:15},
+  414: {price:123000.0, date:'2023-02-01', annualDepr:7380.0, bookVal:12300.0, usefulLife:15},
+  415: {price:57915.0, date:'2023-05-24', annualDepr:3474.9, bookVal:26640.9, usefulLife:15},
+  416: {price:101887.5, date:'2025-03-05', annualDepr:9169.88, bookVal:28528.5, usefulLife:10},
+  417: {price:107250.0, date:'2025-04-02', annualDepr:9652.5, bookVal:58987.5, usefulLife:10},
+  418: {price:48150.0, date:'2025-09-18', annualDepr:2889.0, bookVal:33705.0, usefulLife:15},
+  419: {price:152500.0, date:'2025-11-24', annualDepr:9150.0, bookVal:152500.0, usefulLife:15},
+  420: {price:152500.0, date:'2025-11-24', annualDepr:9150.0, bookVal:152500.0, usefulLife:15},
+  501: {price:93750.0, date:'2011-01-14', annualDepr:7031.25, bookVal:9375.0, usefulLife:12},
+  502: {price:342805.64, date:'2014-12-04', annualDepr:25710.42, bookVal:85701.41, usefulLife:12},
+  503: {price:262395.0, date:'2015-02-08', annualDepr:19679.62, bookVal:65598.75, usefulLife:12},
+  504: {price:192279.31, date:'2017-12-04', annualDepr:14420.95, bookVal:48069.83, usefulLife:12},
+  505: {price:278068.59, date:'2021-07-23', annualDepr:25026.17, bookVal:52833.03, usefulLife:10},
+  509: {price:236754.38, date:'2021-02-18', annualDepr:21307.89, bookVal:23675.44, usefulLife:10},
+  510: {price:220184.25, date:'2023-01-27', annualDepr:16513.82, bookVal:22018.43, usefulLife:12},
+  511: {price:364864.61, date:'2023-08-15', annualDepr:32837.81, bookVal:233513.35, usefulLife:10},
+  512: {price:617883.89, date:'2024-05-10', annualDepr:46341.29, bookVal:571542.6, usefulLife:12},
+  513: {price:617883.89, date:'2024-05-10', annualDepr:46341.29, bookVal:571542.6, usefulLife:12},
+  514: {price:628211.99, date:'2025-08-27', annualDepr:47115.9, bookVal:628211.99, usefulLife:12},
+  515: {price:628211.99, date:'2025-09-24', annualDepr:47115.9, bookVal:628211.99, usefulLife:12},
+  601: {price:47888.0, date:'2020-03-09', annualDepr:4309.92, bookVal:4788.8, usefulLife:10},
+  602: {price:26152.74, date:'2020-03-27', annualDepr:2353.75, bookVal:14384.01, usefulLife:10},
+  603: {price:20752.88, date:'2020-06-04', annualDepr:1867.76, bookVal:11414.08, usefulLife:10},
+  604: {price:113000.0, date:'2021-03-05', annualDepr:10170.0, bookVal:11300.0, usefulLife:10},
+  605: {price:45500.0, date:'2021-02-11', annualDepr:4095.0, bookVal:25025.0, usefulLife:10},
+  606: {price:137750.0, date:'2022-02-11', annualDepr:12397.5, bookVal:50967.5, usefulLife:10},
+  607: {price:65000.0, date:'2020-07-21', annualDepr:5850.0, bookVal:6500.0, usefulLife:10},
+  608: {price:40000.0, date:'2024-01-30', annualDepr:3600.0, bookVal:4000.0, usefulLife:10},
+};
+
+// Active fleet units with missing purchase price — flag for follow-up
+const missingPurchasePrice = [
+  {id:103, name:'CAT 304C CR', cls:'Excavators', yr:2010},
+  {id:201, name:'CAT D5G LGP', cls:'Dozers', yr:2004},
+  {id:202, name:'CAT D5G LGP', cls:'Dozers', yr:2005},
+  {id:305, name:'CAT IT28G', cls:'Compaction/Loaders', yr:1997},
+  {id:402, name:'IR SD100F', cls:'Rollers/Compactors', yr:1990},
+  {id:516, name:'CAT 740GC', cls:'Articulated Trucks', yr:2025},
+];
+
+const STORAGE_KEY = 'fleetops_sold_units';
+const AUTO_SOLD_KEY = 'fleetops_auto_import_v1';
+
+function autoImportSoldUnits() {
+  if (localStorage.getItem(AUTO_SOLD_KEY)) return;
+  const autoSold = [
+    {id:104, name:'CAT 336E',              cls:'Excavators',         yr:2012, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:105, name:'CAT 336EH',             cls:'Excavators',         yr:2014, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:106, name:'CAT 308E CR',           cls:'Excavators',         yr:2015, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:107, name:'CAT 336EH',             cls:'Excavators',         yr:2015, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:110, name:'CAT 349F',              cls:'Excavators',         yr:2016, cum5:93427,  avg:18685, saleDate:'',           salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:205, name:'CAT D6K LGP',           cls:'Dozers',             yr:2012, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:207, name:'CAT D6K2 LGP',          cls:'Dozers',             yr:2015, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:210, name:'CAT D6N XL',            cls:'Dozers',             yr:2019, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:302, name:'CAT 289D',              cls:'Compaction/Loaders', yr:2015, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:304, name:'CAT 259D',              cls:'Compaction/Loaders', yr:2017, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:306, name:'CAT 420F IT',           cls:'Compaction/Loaders', yr:2015, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:405, name:'Bomag BW145D-40',       cls:'Rollers/Compactors', yr:2013, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:407, name:'Sakai SV400T',          cls:'Rollers/Compactors', yr:2009, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:410, name:'Hyundai HR120C-9',      cls:'Rollers/Compactors', yr:2017, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:411, name:'Hyundai HR120C-9',      cls:'Rollers/Compactors', yr:2018, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:505, name:'CAT 745C',              cls:'Articulated Trucks', yr:2016, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:506, name:'CAT 745C',              cls:'Articulated Trucks', yr:2016, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:508, name:'CAT 745C',              cls:'Articulated Trucks', yr:2015, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:509, name:'CAT 745C',              cls:'Articulated Trucks', yr:2017, cum5:218164, avg:43632, saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:511, name:'CAT 745C',              cls:'Articulated Trucks', yr:2019, cum5:81994,  avg:16398, saleDate:'',           salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:609, name:'Wacker BS50-2I',        cls:'Support/Misc',       yr:2015, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:618, name:'JD MX15 Rotary Cutter', cls:'Support/Misc',       yr:2018, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:623, name:'Wacker BS50-2I',        cls:'Support/Misc',       yr:2018, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:626, name:'Gorman-Rupp PA4A60',    cls:'Support/Misc',       yr:2007, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+    {id:627, name:'John Deere 6140D',      cls:'Support/Misc',       yr:2012, cum5:0,      avg:0,     saleDate:'2026-04-03', salePrice:null, addedAt:'2026-04-03', autoImported:true},
+  ];
+  const existing = loadSoldUnits();
+  const existingIds = existing.map(u => u.id);
+  const toAdd = autoSold.filter(u => !existingIds.includes(u.id));
+  saveSoldUnits([...existing, ...toAdd]);
+  localStorage.setItem(AUTO_SOLD_KEY, '1');
+}
+
+function loadSoldUnits() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+function saveSoldUnits(list) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+function getSoldIds() {
+  return loadSoldUnits().map(u => u.id);
+}
+
+function markSold() {
+  const idVal = document.getElementById('fm-unit-id').value.trim();
+  const dateVal = document.getElementById('fm-sale-date').value;
+  const priceVal = document.getElementById('fm-sale-price').value.trim();
+  const errEl = document.getElementById('fm-error');
+
+  const id = parseInt(idVal);
+  if (!idVal || isNaN(id)) { errEl.textContent = '⚠ Enter a valid unit number.'; return; }
+  if (!dateVal) { errEl.textContent = '⚠ Sale date is required.'; return; }
+
+  const roster = fleetRoster.find(r => r.id === id);
+  if (!roster) { errEl.textContent = `⚠ Unit ${id} not found in fleet roster. Check the unit number.`; return; }
+
+  const sold = loadSoldUnits();
+  if (sold.find(u => u.id === id)) { errEl.textContent = `⚠ Unit ${id} is already marked as disposed.`; return; }
+
+  sold.push({
+    id,
+    name: roster.name,
+    cls: roster.cls,
+    yr: roster.yr,
+    cum5: roster.cum5,
+    avg: roster.avg,
+    saleDate: dateVal,
+    salePrice: priceVal ? parseFloat(priceVal.replace(/[$,]/g,'')) : null,
+    addedAt: new Date().toISOString()
+  });
+  saveSoldUnits(sold);
+
+  errEl.textContent = '';
+  document.getElementById('fm-unit-id').value = '';
+  document.getElementById('fm-sale-date').value = '';
+  document.getElementById('fm-sale-price').value = '';
+
+  refreshFleetManager();
+  updateHeaderBadge();
+  showToast(`Unit ${id} — ${roster.name} marked as disposed ✓`);
+}
+
+function removeSold(id) {
+  const sold = loadSoldUnits().filter(u => u.id !== id);
+  saveSoldUnits(sold);
+  refreshFleetManager();
+  updateHeaderBadge();
+  showToast(`Unit ${id} restored to active fleet`);
+}
+
+function clearAllSold() {
+  if (!confirm('Remove all units from the disposed list and restore them to active fleet?')) return;
+  saveSoldUnits([]);
+  refreshFleetManager();
+  updateHeaderBadge();
+  showToast('All units restored to active fleet');
+}
+
+function renderSoldList() {
+  const sold = loadSoldUnits();
+  const search = (document.getElementById('fm-search')?.value || '').toLowerCase();
+  const container = document.getElementById('fm-sold-list');
+  const countEl = document.getElementById('fm-disposed-count');
+
+  const filtered = sold.filter(u =>
+    !search || String(u.id).includes(search) || u.name.toLowerCase().includes(search) || u.cls.toLowerCase().includes(search)
+  );
+
+  countEl.textContent = `${sold.length} unit${sold.length!==1?'s':''}`;
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:20px 0;text-align:center;font-family:'IBM Plex Mono',monospace;">${sold.length===0 ? 'No units marked as disposed yet.' : 'No results match your search.'}</div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(u => {
+    const price = u.salePrice ? '$' + u.salePrice.toLocaleString() : '—';
+    const age = 2025 - u.yr;
+    const saleDateDisplay = u.saleDate ? u.saleDate : `⚠ Date unknown`;
+    const saleDateStyle = u.saleDate ? '' : 'color:var(--warn);';
+    const importedTag = u.autoImported ? ` <span style="font-size:9px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">auto</span>` : '';
+    return `<div class="sold-row">
+      <div class="sold-id">${u.id}</div>
+      <div class="sold-name"><strong>${u.name}</strong>${importedTag} &nbsp;·&nbsp; ${age}yr old (${u.yr})</div>
+      <div class="sold-cls">${u.cls}</div>
+      <div class="sold-date" style="${saleDateStyle}">${saleDateDisplay}</div>
+      <div class="sold-rm">${u.cum5 > 0 ? '$'+(u.cum5/1000).toFixed(0)+'K' : '—'}</div>
+      <div class="sold-price">${price}</div>
+      <button class="remove-btn" onclick="removeSold(${u.id})" title="Restore to active fleet">↩ Restore</button>
+    </div>`;
+  }).join('');
+}
+
+let rosterFilter = 'all';
+function filterRoster(f) {
+  rosterFilter = f;
+  ['all','active','disposed'].forEach(k => {
+    const btn = document.getElementById('roster-btn-' + k);
+    if (btn) btn.style.borderColor = k===f ? 'var(--accent)' : '';
+    if (btn) btn.style.color = k===f ? 'var(--accent)' : '';
+  });
+  renderRoster();
+}
+
+function renderRoster() {
+  const sold = loadSoldUnits();
+  const soldIds = sold.map(u => u.id);
+  const tbody = document.getElementById('roster-tbody');
+  if (!tbody) return;
+
+  const edits = loadEquipEdits();
+  const editedIds = Object.keys(edits).map(Number);
+
+  const rows = fleetRoster.filter(u => {
+    if (rosterFilter === 'active') return !soldIds.includes(u.id);
+    if (rosterFilter === 'disposed') return soldIds.includes(u.id);
+    return true;
+  });
+
+  tbody.innerHTML = rows.map(u => {
+    const unit = getUnit(u.id); // applies any saved overrides
+    const isDisposed = soldIds.includes(u.id);
+    const isEdited = editedIds.includes(u.id);
+    const soldRec = sold.find(s => s.id === u.id);
+    const age = 2025 - unit.yr;
+    const ageColor = age >= 18 ? 'var(--danger)' : age >= 12 ? 'var(--warn)' : 'var(--text-dim)';
+    const statusBadge = isDisposed
+      ? `<span class="rep-badge" style="background:rgba(100,116,139,0.2);color:var(--text-muted);border:1px solid var(--border);">DISPOSED</span>`
+      : `<span class="rep-badge optimal">ACTIVE</span>`;
+    const editedTag = isEdited ? `<span style="font-size:9px;color:var(--accent2);font-family:'IBM Plex Mono',monospace;margin-left:4px;">✎</span>` : '';
+    const disposeBtn = isDisposed
+      ? `<button class="fm-btn ghost action-cell" onclick="removeSold(${u.id})" style="padding:4px 8px;font-size:11px;">↩</button>`
+      : `<button class="fm-btn danger action-cell" onclick="quickSell(${u.id})" style="padding:4px 8px;font-size:11px;">Sell</button>`;
+    const rowCls = isDisposed ? 'roster-disposed' : '';
+    return `<tr class="${rowCls}">
+      <td class="equip-name">${unit.id}</td>
+      <td>${unit.name}${editedTag}</td>
+      <td style="color:var(--text-muted);font-size:10px;">${unit.type||''}</td>
+      <td style="color:var(--text-muted)">${unit.cls}</td>
+      <td style="color:var(--text-muted)">${unit.yr}</td>
+      <td style="color:${ageColor}">${age}yr</td>
+      <td style="color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:10px;">${unit.serial||'—'}</td>
+      <td class="cost">${unit.cum5>0 ? '$'+(unit.cum5/1000).toFixed(0)+'K' : '—'}</td>
+      <td style="color:var(--text-dim)">${unit.avg>0 ? '$'+(unit.avg/1000).toFixed(1)+'K/yr' : '—'}</td>
+      <td>${statusBadge}</td>
+      <td style="color:${isDisposed?'var(--warn)':'var(--text-muted)'};">${soldRec ? soldRec.saleDate : '—'}</td>
+      <td style="color:var(--accent3)">${soldRec?.salePrice ? '$'+soldRec.salePrice.toLocaleString() : '—'}</td>
+      <td class="action-cell" style="white-space:nowrap;display:flex;gap:4px;">
+        <button class="fm-btn ghost action-cell" onclick="openEditModal(${u.id})" style="padding:4px 8px;font-size:11px;" title="Edit details">✎ Edit</button>
+        ${disposeBtn}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function quickSell(id) {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('fm-unit-id').value = id;
+  document.getElementById('fm-sale-date').value = today;
+  document.getElementById('fm-unit-id').focus();
+  // scroll to form
+  document.getElementById('fm-unit-id').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function updateFMStats() {
+  const sold = loadSoldUnits();
+  const soldIds = sold.map(u => u.id);
+  const active = fleetRoster.filter(u => !soldIds.includes(u.id));
+  const activeRM = active.reduce((s, u) => s + u.cum5, 0);
+  const soldRM = sold.reduce((s, u) => s + u.cum5, 0);
+
+  document.getElementById('fm-stat-active').textContent = active.length;
+  document.getElementById('fm-stat-sold').textContent = sold.length;
+  document.getElementById('fm-stat-rm-active').textContent = '$' + (activeRM/1000000).toFixed(2) + 'M';
+  document.getElementById('fm-stat-rm-sold').textContent = '$' + (soldRM/1000).toFixed(0) + 'K';
+}
+
+function updateHeaderBadge() {
+  const soldIds = getSoldIds();
+  const active = fleetRoster.length - soldIds.length;
+  // Update the 64 UNITS badge in header
+  const badges = document.querySelectorAll('.header-badge');
+  badges.forEach(b => {
+    if (b.textContent.includes('UNITS')) b.textContent = active + ' ACTIVE UNITS';
+  });
+}
+
+function populateMissingPrice() {
+  const tbody = document.getElementById('missing-price-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = missingPurchasePrice.map(u => {
+    const age = 2025 - u.yr;
+    const ageColor = age >= 18 ? 'var(--danger)' : age >= 12 ? 'var(--warn)' : 'var(--text-dim)';
+    const roster = fleetRoster.find(r => r.id === u.id);
+    const cum5 = roster ? roster.cum5 : 0;
+    const impact = cum5 > 30000 ? '⚠ High — significant R&M history, TCO incomplete' : 'Moderate — limited cost history';
+    const impactCls = cum5 > 30000 ? 'flag-red' : 'flag-yellow';
+    return `<tr>
+      <td class="equip-name">${u.id}</td>
+      <td>${u.name}</td>
+      <td style="color:var(--text-muted)">${u.cls}</td>
+      <td style="color:var(--text-muted)">${u.yr}</td>
+      <td style="color:${ageColor}">${age}yr</td>
+      <td class="cost">${cum5 > 0 ? '$'+(cum5/1000).toFixed(0)+'K' : '—'}</td>
+      <td class="${impactCls}" style="font-size:11px;">${impact}</td>
+    </tr>`;
+  }).join('');
+}
+
+function refreshFleetManager() {
+  renderSoldList();
+  renderRoster();
+  updateFMStats();
+  populateMissingPrice();
+}
+
+function exportSoldList() {
+  const sold = loadSoldUnits();
+  if (!sold.length) { showToast('No disposed units to export'); return; }
+  const rows = [['Unit #','Model','Class','Model Year','Age','5-Yr R&M','Avg $/Yr','Sale Date','Sale Price']];
+  sold.forEach(u => rows.push([u.id, u.name, u.cls, u.yr, 2025-u.yr, u.cum5, u.avg, u.saleDate, u.salePrice||'']));
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'disposed_fleet_units.csv'; a.click();
+}
+
+// Toast notification
+function showToast(msg) {
+  let t = document.getElementById('fm-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'fm-toast';
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1e2535;border:1px solid var(--accent);color:var(--text);padding:10px 18px;border-radius:6px;font-size:12px;font-family:"IBM Plex Mono",monospace;z-index:9999;transition:opacity 0.3s;pointer-events:none;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg; t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.style.opacity = '0', 2800);
+}
+
+// ============================================================
+// NAV
+// ============================================================
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  event.target.classList.add('active');
+  if (id === 'fleet_manager') refreshFleetManager();
+  if (id === 'telematics') { populateTelemFields(); loadCachedTelem(); }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  autoImportSoldUnits();
+  populateTop10();
+  populateCumulative();
+  populateReplacement();
+  populatePMBars();
+  initCharts();
+  updateHeaderBadge();
+  populateTelemFields();
+  loadCachedTelem();
+  const today = new Date().toISOString().split('T')[0];
+  const dateInput = document.getElementById('fm-sale-date');
+  if (dateInput) dateInput.value = today;
+});
+</script>
+</body>
+</html>
