@@ -1821,120 +1821,6 @@ function initCharts() {
     }
   });
 
-  // TOP 15 HOURS BAR CHART — populated from VisionLink telemData
-  function buildHoursCharts() {
-    if (!telemData || !telemData.length) {
-      const el = document.getElementById('chart-top-hours');
-      if (el) el.parentElement.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-family:\'IBM Plex Mono\',monospace;font-size:11px;">Connect to VisionLink to load live hours data</div>';
-      const el2 = document.getElementById('chart-hours-by-class');
-      if (el2) el2.parentElement.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-family:\'IBM Plex Mono\',monospace;font-size:11px;">Connect to VisionLink to load live hours data</div>';
-      return;
-    }
-
-    // Build hours list from live telematics
-    const econLife = {'Excavators':12000,'Dozers':14000,'Articulated Trucks':15000,'Rollers/Compactors':10000,'Compaction/Loaders':8000,'Support/Misc':8000};
-    const unitsWithHours = telemData
-      .filter(u => u.CumulativeOperatingHours?.Hour)
-      .map(u => {
-        const uid = parseInt(u.EquipmentHeader?.EquipmentID) || 0;
-        const unit = getUnit(uid) || {name: `${u.EquipmentHeader?.OEMName||''} ${u.EquipmentHeader?.Model||''}`.trim(), cls:'Support/Misc'};
-        const hours = u.CumulativeOperatingHours.Hour;
-        const threshold = econLife[unit.cls] || 10000;
-        return {id: uid, name: unit.name, cls: unit.cls, hours, threshold, pct: (hours/threshold*100).toFixed(1)};
-      })
-      .sort((a,b) => b.hours - a.hours);
-
-    const top15 = unitsWithHours.slice(0, 15);
-
-    // Update KPI cards
-    const totalHrs = unitsWithHours.reduce((s,u) => s+u.hours, 0);
-    const avgHrs = unitsWithHours.length ? Math.round(totalHrs/unitsWithHours.length) : 0;
-    const exceeded = unitsWithHours.filter(u => u.pct >= 100).length;
-    const watching = unitsWithHours.filter(u => u.pct >= 80 && u.pct < 100).length;
-    document.getElementById('aemp-kpi-total-hrs').textContent = totalHrs >= 1000 ? Math.round(totalHrs/1000)+'K' : totalHrs;
-    document.getElementById('aemp-kpi-avg-hrs').textContent = avgHrs.toLocaleString();
-    document.getElementById('aemp-kpi-exceeded').textContent = exceeded;
-    document.getElementById('aemp-kpi-watching').textContent = watching;
-
-    // Top 15 bar chart
-    const hoursChartEl = document.getElementById('chart-top-hours');
-    if (hoursChartEl && top15.length) {
-      if (window._hoursChart) window._hoursChart.destroy();
-      window._hoursChart = new Chart(hoursChartEl, {
-        type: 'bar',
-        data: {
-          labels: top15.map(u => `#${u.id} ${u.name.replace(/Caterpillar /,'CAT ')}`),
-          datasets: [{
-            label: 'Cumulative Hours',
-            data: top15.map(u => u.hours),
-            backgroundColor: top15.map(u => u.pct >= 100 ? 'rgba(220,38,38,0.75)' : u.pct >= 80 ? 'rgba(234,88,12,0.75)' : 'rgba(37,99,235,0.75)'),
-            borderWidth: 0, borderRadius: 3,
-          }]
-        },
-        options: {
-          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { grid: { color: 'rgba(203,213,225,0.4)' }, ticks: { callback: v => v.toLocaleString()+' hrs' } },
-            y: { grid: { display: false }, ticks: { font: {size:10} } }
-          }
-        }
-      });
-    }
-
-    // Hours by class donut
-    const byClass = {};
-    unitsWithHours.forEach(u => { byClass[u.cls] = (byClass[u.cls]||0) + u.hours; });
-    const classHoursEl = document.getElementById('chart-hours-by-class');
-    if (classHoursEl && Object.keys(byClass).length) {
-      if (window._classHoursChart) window._classHoursChart.destroy();
-      const clsLabels = Object.keys(byClass).sort((a,b) => byClass[b]-byClass[a]);
-      window._classHoursChart = new Chart(classHoursEl, {
-        type: 'doughnut',
-        data: {
-          labels: clsLabels,
-          datasets: [{
-            data: clsLabels.map(c => byClass[c]),
-            backgroundColor: ['#d97706','#059669','#2563eb','#7c3aed','#db2777','#64748b','#0891b2'],
-            borderWidth: 0, hoverOffset: 6,
-          }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false, cutout: '55%',
-          plugins: {
-            legend: { position: 'right', labels: { boxWidth:10, font:{size:10}, padding:10 } },
-            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw.toLocaleString()} hrs` } }
-          }
-        }
-      });
-    }
-
-    // Economic life table
-    const tbody = document.getElementById('hours-life-tbody');
-    if (tbody) {
-      tbody.innerHTML = unitsWithHours.map(u => {
-        const color = u.pct >= 100 ? 'var(--danger)' : u.pct >= 80 ? 'var(--warn)' : u.pct >= 60 ? 'var(--accent)' : 'var(--accent3)';
-        const badge = u.pct >= 100
-          ? `<span class="rep-badge critical">● EXCEEDED</span>`
-          : u.pct >= 80
-            ? `<span class="rep-badge monitor">◐ WATCH</span>`
-            : `<span class="rep-badge optimal">○ OK</span>`;
-        const roster = fleetRoster.find(r => r.id === u.id);
-        const age = roster ? 2026 - roster.yr : '—';
-        return `<tr>
-          <td class="equip-name">${u.id}</td>
-          <td>${u.name}</td>
-          <td style="color:var(--text-muted)">${u.cls}</td>
-          <td style="color:var(--text-muted)">${age}yr</td>
-          <td style="font-family:'IBM Plex Mono',monospace;">${u.hours.toLocaleString()} hrs</td>
-          <td style="color:var(--text-muted)">${u.threshold.toLocaleString()} hrs</td>
-          <td style="color:${color};font-weight:600;">${u.pct}%</td>
-          <td>${badge}</td>
-        </tr>`;
-      }).join('');
-    }
-  }
-
     const scatterUnits = data.top10_2024.slice(0, 10);
   new Chart(document.getElementById('chart-pm-scatter'), {
     type: 'bar',
@@ -1957,7 +1843,117 @@ function initCharts() {
 }
 
 // ============================================================
-// EQUIPMENT EDITOR — name, class, model year overrides
+// HOURS CHARTS — VisionLink live data only
+// ============================================================
+function buildHoursCharts() {
+  if (!telemData || !telemData.length) {
+    const el = document.getElementById('chart-top-hours');
+    if (el) el.parentElement.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-family:\'IBM Plex Mono\',monospace;font-size:11px;">Connect to VisionLink to load live hours data</div>';
+    const el2 = document.getElementById('chart-hours-by-class');
+    if (el2) el2.parentElement.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-family:\'IBM Plex Mono\',monospace;font-size:11px;">Connect to VisionLink to load live hours data</div>';
+    return;
+  }
+
+  const econLife = {'Excavators':12000,'Dozers':14000,'Articulated Trucks':15000,'Rollers/Compactors':10000,'Compaction/Loaders':8000,'Support/Misc':8000};
+  const unitsWithHours = telemData
+    .filter(u => u.CumulativeOperatingHours?.Hour)
+    .map(u => {
+      const uid = parseInt(u.EquipmentHeader?.EquipmentID) || 0;
+      const unit = getUnit(uid) || {name: `${u.EquipmentHeader?.OEMName||''} ${u.EquipmentHeader?.Model||''}`.trim(), cls:'Support/Misc'};
+      const hours = u.CumulativeOperatingHours.Hour;
+      const threshold = econLife[unit.cls] || 10000;
+      return {id: uid, name: unit.name, cls: unit.cls, hours, threshold, pct: (hours/threshold*100).toFixed(1)};
+    })
+    .sort((a,b) => b.hours - a.hours);
+
+  const top15 = unitsWithHours.slice(0, 15);
+
+  // Update KPI cards
+  const totalHrs = unitsWithHours.reduce((s,u) => s+u.hours, 0);
+  const avgHrs = unitsWithHours.length ? Math.round(totalHrs/unitsWithHours.length) : 0;
+  const exceeded = unitsWithHours.filter(u => parseFloat(u.pct) >= 100).length;
+  const watching = unitsWithHours.filter(u => parseFloat(u.pct) >= 80 && parseFloat(u.pct) < 100).length;
+  const kpis = {
+    'aemp-kpi-total-hrs': totalHrs >= 1000 ? Math.round(totalHrs/1000)+'K' : totalHrs,
+    'aemp-kpi-avg-hrs': avgHrs.toLocaleString(),
+    'aemp-kpi-exceeded': exceeded,
+    'aemp-kpi-watching': watching,
+  };
+  Object.entries(kpis).forEach(([id,val]) => { const el = document.getElementById(id); if (el) el.textContent = val; });
+
+  // Top 15 bar chart
+  const hoursChartEl = document.getElementById('chart-top-hours');
+  if (hoursChartEl && top15.length) {
+    if (window._hoursChart) window._hoursChart.destroy();
+    window._hoursChart = new Chart(hoursChartEl, {
+      type: 'bar',
+      data: {
+        labels: top15.map(u => `#${u.id} ${u.name.replace(/Caterpillar /,'CAT ')}`),
+        datasets: [{ label: 'Cumulative Hours', data: top15.map(u => u.hours),
+          backgroundColor: top15.map(u => parseFloat(u.pct) >= 100 ? 'rgba(220,38,38,0.75)' : parseFloat(u.pct) >= 80 ? 'rgba(234,88,12,0.75)' : 'rgba(37,99,235,0.75)'),
+          borderWidth: 0, borderRadius: 3 }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(203,213,225,0.4)' }, ticks: { callback: v => v.toLocaleString()+' hrs' } },
+          y: { grid: { display: false }, ticks: { font: {size:10} } }
+        }
+      }
+    });
+  }
+
+  // Hours by class donut
+  const byClass = {};
+  unitsWithHours.forEach(u => { byClass[u.cls] = (byClass[u.cls]||0) + u.hours; });
+  const classHoursEl = document.getElementById('chart-hours-by-class');
+  if (classHoursEl && Object.keys(byClass).length) {
+    if (window._classHoursChart) window._classHoursChart.destroy();
+    const clsLabels = Object.keys(byClass).sort((a,b) => byClass[b]-byClass[a]);
+    window._classHoursChart = new Chart(classHoursEl, {
+      type: 'doughnut',
+      data: {
+        labels: clsLabels,
+        datasets: [{ data: clsLabels.map(c => byClass[c]),
+          backgroundColor: ['#d97706','#059669','#2563eb','#7c3aed','#db2777','#64748b','#0891b2'],
+          borderWidth: 0, hoverOffset: 6 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '55%',
+        plugins: {
+          legend: { position: 'right', labels: { boxWidth:10, font:{size:10}, padding:10 } },
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw.toLocaleString()} hrs` } }
+        }
+      }
+    });
+  }
+
+  // Economic life table
+  const tbody = document.getElementById('hours-life-tbody');
+  if (tbody) {
+    tbody.innerHTML = unitsWithHours.map(u => {
+      const color = parseFloat(u.pct) >= 100 ? 'var(--danger)' : parseFloat(u.pct) >= 80 ? 'var(--warn)' : parseFloat(u.pct) >= 60 ? 'var(--accent)' : 'var(--accent3)';
+      const badge = parseFloat(u.pct) >= 100
+        ? `<span class="rep-badge critical">● EXCEEDED</span>`
+        : parseFloat(u.pct) >= 80
+          ? `<span class="rep-badge monitor">◐ WATCH</span>`
+          : `<span class="rep-badge optimal">○ OK</span>`;
+      const roster = fleetRoster.find(r => r.id === u.id);
+      const age = roster ? 2026 - roster.yr : '—';
+      return `<tr>
+        <td class="equip-name">${u.id}</td>
+        <td>${u.name}</td>
+        <td style="color:var(--text-muted)">${u.cls}</td>
+        <td style="color:var(--text-muted)">${age}yr</td>
+        <td style="font-family:'IBM Plex Mono',monospace;">${u.hours.toLocaleString()} hrs</td>
+        <td style="color:var(--text-muted)">${u.threshold.toLocaleString()} hrs</td>
+        <td style="color:${color};font-weight:600;">${u.pct}%</td>
+        <td>${badge}</td>
+      </tr>`;
+    }).join('');
+  }
+}
 // ============================================================
 const EDITS_KEY = 'fleetops_equip_edits';
 
@@ -2861,7 +2857,6 @@ function showView(id) {
   event.target.classList.add('active');
   if (id === 'fleet_manager') refreshFleetManager();
   if (id === 'telematics') { populateTelemFields(); loadCachedTelem(); }
-  if (id === 'aemp_kpis') { buildHoursCharts(); }
   if (id === 'aemp_kpis') { buildHoursCharts(); }
 }
 
