@@ -558,7 +558,7 @@
   <!-- Top R&M units 2024 + PM Ratio -->
   <div class="panel-grid-21">
     <div class="panel accent">
-      <div class="panel-title">Top 10 R&M Cost Units — 2024 <span class="aemp-tag">REPAIR INTENSITY</span></div>
+      <div class="panel-title">Top 10 R&M Cost Units — Full Period (2021–2026) <span class="aemp-tag">REPAIR INTENSITY</span></div>
       <table class="data-table">
         <tr>
           <th>Unit</th><th>Model</th><th>Class</th><th>Age</th>
@@ -581,7 +581,7 @@
   <!-- Age cohort bar -->
   <div class="panel-grid-2">
     <div class="panel warn">
-      <div class="panel-title">R&M Cost Intensity by Age Cohort (2024 avg/unit) <span class="aemp-tag">ECONOMIC LIFE</span></div>
+      <div class="panel-title">R&M Cost Intensity by Age Cohort (Avg/Unit Full Period) <span class="aemp-tag">ECONOMIC LIFE</span></div>
       <div class="chart-wrap" style="height:180px;">
         <canvas id="chart-cohort"></canvas>
       </div>
@@ -835,42 +835,65 @@
 <div class="view" id="view-aemp_kpis">
   <div class="section-label">AEMP Key Performance Indicators</div>
 
-  <div class="alert-banner">
-    <div class="alert-icon">ℹ</div>
-    <div><strong style="color:var(--accent2)">Data Status:</strong> Availability and utilization KPIs require telematics hours (scheduled, available, operating). Currently showing R&M-derived KPIs. Once VisionLink/Trimble connected, full AEMP KPI suite will populate including Physical Availability, Use Availability, Utilization Rate, and MTBF by system.</div>
+  <div class="alert-banner" style="background:rgba(5,150,105,0.06);border-color:rgba(5,150,105,0.25);">
+    <div class="alert-icon" style="color:var(--accent3);">✓</div>
+    <div><strong style="color:var(--accent3)">VisionLink Connected:</strong> Live cumulative operating hours, engine status, location, and fuel data flowing. Physical Availability, Use Availability, and Utilization Rate have been removed — these require scheduled hours which are not tracked. Charts below show available hours-based KPIs.</div>
   </div>
 
-  <div class="panel-grid-3">
-    <div class="panel">
-      <div class="panel-title">Physical Availability <span class="aemp-tag">TARGET ≥85%</span></div>
-      <div class="gauge-wrap">
-        <canvas class="gauge-canvas" id="gauge-pa"></canvas>
-        <div class="gauge-value">—</div>
-        <div class="gauge-label">Requires telematics hours</div>
+  <!-- HOURS KPI CARDS -->
+  <div class="panel-grid-4" style="margin-bottom:14px;">
+    <div class="panel blue">
+      <div class="panel-title">Total Fleet Hours <span class="aemp-tag">VISIONLINK LIVE</span></div>
+      <div class="kpi-value blue" id="aemp-kpi-total-hrs">—</div>
+      <div class="kpi-sub">All units with hours data</div>
+    </div>
+    <div class="panel accent">
+      <div class="panel-title">Avg Hours/Unit <span class="aemp-tag">VISIONLINK LIVE</span></div>
+      <div class="kpi-value accent" id="aemp-kpi-avg-hrs">—</div>
+      <div class="kpi-sub">Units reporting hours</div>
+    </div>
+    <div class="panel danger">
+      <div class="panel-title">Units Exceeding Life Hrs <span class="aemp-tag">ECONOMIC LIFE</span></div>
+      <div class="kpi-value danger" id="aemp-kpi-exceeded">—</div>
+      <div class="kpi-sub">100%+ of class threshold</div>
+    </div>
+    <div class="panel warn">
+      <div class="panel-title">Units at 80%+ Life Hrs <span class="aemp-tag">WATCH LIST</span></div>
+      <div class="kpi-value warn" id="aemp-kpi-watching">—</div>
+      <div class="kpi-sub">Approaching economic life threshold</div>
+    </div>
+  </div>
+
+  <!-- HOURS CHARTS -->
+  <div class="panel-grid-2" style="margin-bottom:14px;">
+    <div class="panel blue">
+      <div class="panel-title">Top 15 Units by Cumulative Operating Hours <span class="aemp-tag">VISIONLINK — UPDATES ON FETCH</span></div>
+      <div class="chart-wrap" style="height:260px;">
+        <canvas id="chart-top-hours"></canvas>
       </div>
-      <div style="margin-top:8px; font-size:10px; color:var(--text-muted);">PA = (Scheduled Hrs − Downtime Hrs) / Scheduled Hrs × 100. AEMP target: ≥85%</div>
     </div>
     <div class="panel">
-      <div class="panel-title">Use Availability <span class="aemp-tag">TARGET ≥75%</span></div>
-      <div class="gauge-wrap">
-        <div class="gauge-value" style="margin-top:20px;">—</div>
-        <div class="gauge-label">Requires telematics hours</div>
+      <div class="panel-title">Total Hours by Fleet Class <span class="aemp-tag">ALL ACTIVE UNITS</span></div>
+      <div class="chart-wrap" style="height:260px;">
+        <canvas id="chart-hours-by-class"></canvas>
       </div>
-      <div style="margin-top:8px; font-size:10px; color:var(--text-muted);">UA = Operating Hrs / Available Hrs × 100. Indicates how well available assets are utilized.</div>
     </div>
-    <div class="panel">
-      <div class="panel-title">Utilization Rate <span class="aemp-tag">TARGET ≥60%</span></div>
-      <div class="gauge-wrap">
-        <div class="gauge-value" style="margin-top:20px;">—</div>
-        <div class="gauge-label">Requires telematics hours</div>
-      </div>
-      <div style="margin-top:8px; font-size:10px; color:var(--text-muted);">UR = Operating Hrs / Scheduled Hrs × 100. Combined availability + use metric.</div>
+  </div>
+
+  <!-- ECONOMIC LIFE HOURS TABLE -->
+  <div class="panel panel-full" style="margin-bottom:14px;">
+    <div class="panel-title">Economic Life Hours Monitor — All Units with Hours Data <span class="aemp-tag">% OF CLASS THRESHOLD</span></div>
+    <div style="overflow-x:auto;">
+      <table class="data-table" id="hours-life-tbody-wrap">
+        <thead><tr><th>Unit #</th><th>Model</th><th>Class</th><th>Age</th><th>Hours</th><th>Life Threshold</th><th>% Used</th><th>Status</th></tr></thead>
+        <tbody id="hours-life-tbody"></tbody>
+      </table>
     </div>
   </div>
 
   <div class="panel-grid-2">
     <div class="panel green">
-      <div class="panel-title">Planned Maintenance Ratio — Fleet (2022–2024 avg) <span class="aemp-tag">AEMP TARGET ≥70%</span></div>
+      <div class="panel-title">Planned Maintenance Ratio — Fleet (2021–2025) <span class="aemp-tag">AEMP TARGET ≥70%</span></div>
       <div class="chart-wrap" style="height:200px;">
         <canvas id="chart-pmr"></canvas>
       </div>
@@ -884,49 +907,49 @@
           <td class="equip-name">Fleet R&M $/Unit</td>
           <td>Avg annual R&M cost per unit</td>
           <td style="color:var(--text-muted)">Industry varies</td>
-          <td class="cost">$11.9K</td>
+          <td class="cost">$8.1K</td>
           <td><span class="rep-badge optimal">TRACKED</span></td>
         </tr>
         <tr>
           <td class="equip-name">PM Ratio (PMR)</td>
           <td>Planned % of total R&M</td>
           <td style="color:var(--accent3)">≥70%</td>
-          <td class="flag-yellow">~55%</td>
-          <td><span class="rep-badge monitor">BELOW</span></td>
+          <td class="flag-red">~41%</td>
+          <td><span class="rep-badge critical">BELOW</span></td>
         </tr>
         <tr>
           <td class="equip-name">Physical Avail.</td>
           <td>Uptime / Scheduled time</td>
           <td style="color:var(--accent3)">≥85%</td>
-          <td class="flag-yellow">Pending</td>
-          <td><span class="rep-badge monitor">API REQ'D</span></td>
+          <td class="flag-yellow">Sched. hrs needed</td>
+          <td><span class="rep-badge monitor">PENDING</span></td>
         </tr>
         <tr>
           <td class="equip-name">Use Avail.</td>
           <td>Operating / Available hrs</td>
           <td style="color:var(--accent3)">≥75%</td>
-          <td class="flag-yellow">Pending</td>
-          <td><span class="rep-badge monitor">API REQ'D</span></td>
+          <td class="flag-yellow">Sched. hrs needed</td>
+          <td><span class="rep-badge monitor">PENDING</span></td>
         </tr>
         <tr>
           <td class="equip-name">Utilization Rate</td>
           <td>Operating / Scheduled hrs</td>
           <td style="color:var(--accent3)">≥60%</td>
-          <td class="flag-yellow">Pending</td>
-          <td><span class="rep-badge monitor">API REQ'D</span></td>
+          <td class="flag-yellow">Sched. hrs needed</td>
+          <td><span class="rep-badge monitor">PENDING</span></td>
         </tr>
         <tr>
           <td class="equip-name">MTBF</td>
           <td>Mean time between failures</td>
           <td style="color:var(--text-muted)">Maximize</td>
-          <td class="flag-yellow">Pending</td>
-          <td><span class="rep-badge monitor">API REQ'D</span></td>
+          <td class="flag-yellow">Fault code data needed</td>
+          <td><span class="rep-badge monitor">PENDING</span></td>
         </tr>
         <tr>
           <td class="equip-name">Economic Life</td>
           <td>Age vs. R&M cost curve</td>
           <td style="color:var(--text-muted)">Min TCO/hr</td>
-          <td class="flag-red">5 critical</td>
+          <td class="flag-red">6 critical</td>
           <td><span class="rep-badge critical">ACTION</span></td>
         </tr>
       </table>
@@ -1798,8 +1821,121 @@ function initCharts() {
     }
   });
 
-  // PM SCATTER (R&M analysis)
-  const scatterUnits = data.top10_2024.slice(0, 10);
+  // TOP 15 HOURS BAR CHART — populated from VisionLink telemData
+  function buildHoursCharts() {
+    if (!telemData || !telemData.length) {
+      const el = document.getElementById('chart-top-hours');
+      if (el) el.parentElement.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-family:\'IBM Plex Mono\',monospace;font-size:11px;">Connect to VisionLink to load live hours data</div>';
+      const el2 = document.getElementById('chart-hours-by-class');
+      if (el2) el2.parentElement.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-family:\'IBM Plex Mono\',monospace;font-size:11px;">Connect to VisionLink to load live hours data</div>';
+      return;
+    }
+
+    // Build hours list from live telematics
+    const econLife = {'Excavators':12000,'Dozers':14000,'Articulated Trucks':15000,'Rollers/Compactors':10000,'Compaction/Loaders':8000,'Support/Misc':8000};
+    const unitsWithHours = telemData
+      .filter(u => u.CumulativeOperatingHours?.Hour)
+      .map(u => {
+        const uid = parseInt(u.EquipmentHeader?.EquipmentID) || 0;
+        const unit = getUnit(uid) || {name: `${u.EquipmentHeader?.OEMName||''} ${u.EquipmentHeader?.Model||''}`.trim(), cls:'Support/Misc'};
+        const hours = u.CumulativeOperatingHours.Hour;
+        const threshold = econLife[unit.cls] || 10000;
+        return {id: uid, name: unit.name, cls: unit.cls, hours, threshold, pct: (hours/threshold*100).toFixed(1)};
+      })
+      .sort((a,b) => b.hours - a.hours);
+
+    const top15 = unitsWithHours.slice(0, 15);
+
+    // Update KPI cards
+    const totalHrs = unitsWithHours.reduce((s,u) => s+u.hours, 0);
+    const avgHrs = unitsWithHours.length ? Math.round(totalHrs/unitsWithHours.length) : 0;
+    const exceeded = unitsWithHours.filter(u => u.pct >= 100).length;
+    const watching = unitsWithHours.filter(u => u.pct >= 80 && u.pct < 100).length;
+    document.getElementById('aemp-kpi-total-hrs').textContent = totalHrs >= 1000 ? Math.round(totalHrs/1000)+'K' : totalHrs;
+    document.getElementById('aemp-kpi-avg-hrs').textContent = avgHrs.toLocaleString();
+    document.getElementById('aemp-kpi-exceeded').textContent = exceeded;
+    document.getElementById('aemp-kpi-watching').textContent = watching;
+
+    // Top 15 bar chart
+    const hoursChartEl = document.getElementById('chart-top-hours');
+    if (hoursChartEl && top15.length) {
+      if (window._hoursChart) window._hoursChart.destroy();
+      window._hoursChart = new Chart(hoursChartEl, {
+        type: 'bar',
+        data: {
+          labels: top15.map(u => `#${u.id} ${u.name.replace(/Caterpillar /,'CAT ')}`),
+          datasets: [{
+            label: 'Cumulative Hours',
+            data: top15.map(u => u.hours),
+            backgroundColor: top15.map(u => u.pct >= 100 ? 'rgba(220,38,38,0.75)' : u.pct >= 80 ? 'rgba(234,88,12,0.75)' : 'rgba(37,99,235,0.75)'),
+            borderWidth: 0, borderRadius: 3,
+          }]
+        },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: 'rgba(203,213,225,0.4)' }, ticks: { callback: v => v.toLocaleString()+' hrs' } },
+            y: { grid: { display: false }, ticks: { font: {size:10} } }
+          }
+        }
+      });
+    }
+
+    // Hours by class donut
+    const byClass = {};
+    unitsWithHours.forEach(u => { byClass[u.cls] = (byClass[u.cls]||0) + u.hours; });
+    const classHoursEl = document.getElementById('chart-hours-by-class');
+    if (classHoursEl && Object.keys(byClass).length) {
+      if (window._classHoursChart) window._classHoursChart.destroy();
+      const clsLabels = Object.keys(byClass).sort((a,b) => byClass[b]-byClass[a]);
+      window._classHoursChart = new Chart(classHoursEl, {
+        type: 'doughnut',
+        data: {
+          labels: clsLabels,
+          datasets: [{
+            data: clsLabels.map(c => byClass[c]),
+            backgroundColor: ['#d97706','#059669','#2563eb','#7c3aed','#db2777','#64748b','#0891b2'],
+            borderWidth: 0, hoverOffset: 6,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '55%',
+          plugins: {
+            legend: { position: 'right', labels: { boxWidth:10, font:{size:10}, padding:10 } },
+            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw.toLocaleString()} hrs` } }
+          }
+        }
+      });
+    }
+
+    // Economic life table
+    const tbody = document.getElementById('hours-life-tbody');
+    if (tbody) {
+      tbody.innerHTML = unitsWithHours.map(u => {
+        const color = u.pct >= 100 ? 'var(--danger)' : u.pct >= 80 ? 'var(--warn)' : u.pct >= 60 ? 'var(--accent)' : 'var(--accent3)';
+        const badge = u.pct >= 100
+          ? `<span class="rep-badge critical">● EXCEEDED</span>`
+          : u.pct >= 80
+            ? `<span class="rep-badge monitor">◐ WATCH</span>`
+            : `<span class="rep-badge optimal">○ OK</span>`;
+        const roster = fleetRoster.find(r => r.id === u.id);
+        const age = roster ? 2026 - roster.yr : '—';
+        return `<tr>
+          <td class="equip-name">${u.id}</td>
+          <td>${u.name}</td>
+          <td style="color:var(--text-muted)">${u.cls}</td>
+          <td style="color:var(--text-muted)">${age}yr</td>
+          <td style="font-family:'IBM Plex Mono',monospace;">${u.hours.toLocaleString()} hrs</td>
+          <td style="color:var(--text-muted)">${u.threshold.toLocaleString()} hrs</td>
+          <td style="color:${color};font-weight:600;">${u.pct}%</td>
+          <td>${badge}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+    const scatterUnits = data.top10_2024.slice(0, 10);
   new Chart(document.getElementById('chart-pm-scatter'), {
     type: 'bar',
     data: {
@@ -2004,7 +2140,9 @@ async function fetchTelematics() {
     }));
 
     renderTelematics();
+    buildHoursCharts();
     updateTelemHeader(true);
+    buildHoursCharts();
     showToast(`✓ Live data loaded — ${telemData.length} units reporting`);
 
   } catch(err) {
@@ -2047,8 +2185,7 @@ function renderTelematics() {
     const header = u.EquipmentHeader || {};
     const uid = parseInt(header.EquipmentID) || 0;
     const unit = getUnit(uid) || { name: `${header.OEMName||''} ${header.Model||''}`.trim(), cls: 'Support/Misc', cum5: 0 };
-    const hours = u.CumulativeOperatingHours?.Hour || foundationHours[uid] || null;
-    const hoursSource = u.CumulativeOperatingHours?.Hour ? 'live' : foundationHours[uid] ? 'foundation' : null;
+    const hours = u.CumulativeOperatingHours?.Hour || null;
     const running = u.EngineStatus?.Running;
     const lastReport = u.Location?.Datetime || u.CumulativeOperatingHours?.Datetime || '';
     const odometer = u.Distance?.Odometer;
@@ -2077,7 +2214,7 @@ function renderTelematics() {
 
     // Hours display
     const hoursDisplay = hours
-      ? `${hours.toLocaleString()} hrs <span style="font-size:9px;color:var(--text-muted)">${hoursSource==='foundation'?'(F)':'(L)'}</span>`
+      ? `${hours.toLocaleString()} hrs`
       : `<span style="color:var(--text-muted)">—</span>`;
 
     // Life % color
@@ -2168,6 +2305,7 @@ function loadCachedTelem() {
     if (cached && cached.data) {
       telemData = cached.data;
       renderTelematics();
+      buildHoursCharts();
       document.getElementById('tl-last-updated').textContent = `Cached: ${new Date(cached.fetchedAt).toLocaleString()}`;
       updateTelemHeader(true);
     }
@@ -2423,93 +2561,7 @@ const purchaseData = {
 
 const missingPurchasePrice = [];
 
-const foundationHours = {
-  101: 1439,
-  102: 2877,
-  108: 1931,
-  109: 4573,
-  111: 4885,
-  112: 4902,
-  113: 1848,
-  114: 1984,
-  115: 3930,
-  116: 1785,
-  117: 3292,
-  118: 1020,
-  119: 616,
-  120: 112,
-  201: 1506,
-  202: 1799,
-  206: 4425,
-  209: 5070,
-  211: 4953,
-  212: 6199,
-  214: 5552,
-  215: 4131,
-  216: 682,
-  217: 4633,
-  218: 3207,
-  219: 3369,
-  220: 1014,
-  221: 319,
-  222: 232,
-  301: 128,
-  305: 2802,
-  307: 1413,
-  308: 956,
-  309: 746,
-  310: 2011,
-  311: 1014,
-  312: 577,
-  313: 139,
-  315: 19,
-  401: 1898,
-  402: 934,
-  403: 1011,
-  404: 1198,
-  406: 897,
-  409: 1212,
-  412: 2734,
-  413: 1909,
-  414: 479,
-  415: 377,
-  416: 1031,
-  417: 232,
-  418: 55,
-  419: 249,
-  420: 200,
-  501: 21463,
-  502: 3744,
-  503: 2956,
-  504: 4023,
-  510: 2586,
-  512: 2288,
-  513: 2507,
-  514: 853,
-  515: 555,
-  516: 429,
-  601: 317,
-  603: 16,
-  604: 675,
-  605: 110,
-  606: 251,
-  607: 70,
-  608: 273,
-  705: 273,
-  707: 422,
-  727: 593,
-  728: 954,
-  737: 46,
-  765: 39,
-  814: 2,
-  816: 351,
-  817: 678,
-  827: 294,
-  831: 995,
-  832: 967,
-  835: 5,
-  837: 838,
-};
+
 
 const STORAGE_KEY = 'fleetops_sold_units';
 const AUTO_SOLD_KEY = 'fleetops_auto_import_v1';
@@ -2809,6 +2861,8 @@ function showView(id) {
   event.target.classList.add('active');
   if (id === 'fleet_manager') refreshFleetManager();
   if (id === 'telematics') { populateTelemFields(); loadCachedTelem(); }
+  if (id === 'aemp_kpis') { buildHoursCharts(); }
+  if (id === 'aemp_kpis') { buildHoursCharts(); }
 }
 
 // ============================================================
@@ -2824,6 +2878,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateHeaderBadge();
   populateTelemFields();
   loadCachedTelem();
+  buildHoursCharts();
   const today = new Date().toISOString().split('T')[0];
   const dateInput = document.getElementById('fm-sale-date');
   if (dateInput) dateInput.value = today;
