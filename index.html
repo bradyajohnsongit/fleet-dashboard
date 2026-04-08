@@ -508,19 +508,19 @@
   </div>
   <div class="panel-grid-4">
     <div class="panel accent">
-      <div class="panel-title">Total Fleet R&M (Full Period) <span class="aemp-tag">AEMP CODE 200+100</span></div>
-      <div class="kpi-value accent">$4.47M</div>
-      <div class="kpi-sub">4/1/2021 – 3/31/2026 · Foundation data</div>
+      <div class="panel-title">Total Fleet R&M (2025) <span class="aemp-tag">AEMP CODE 200+100</span></div>
+      <div class="kpi-value accent">$1.26M</div>
+      <div class="kpi-sub">Full-Year 2025 <span class="kpi-delta up">▲ +44% vs 2024</span></div>
     </div>
     <div class="panel blue">
-      <div class="panel-title">Repair vs PM Split <span class="aemp-tag">AEMP PMR</span></div>
-      <div class="kpi-value blue">59/41</div>
+      <div class="panel-title">Repair vs PM Split (2025) <span class="aemp-tag">AEMP PMR</span></div>
+      <div class="kpi-value blue">65/35</div>
       <div class="kpi-sub">Repair / PM% &nbsp;<span class="kpi-delta up">Below 70% target</span></div>
     </div>
     <div class="panel green">
-      <div class="panel-title">Fleet R&M per Year (Avg) <span class="aemp-tag">5-YR AVG</span></div>
-      <div class="kpi-value green">$894K</div>
-      <div class="kpi-sub">Average annual spend</div>
+      <div class="panel-title">Fleet R&M (2021–2025) <span class="aemp-tag">CUMULATIVE</span></div>
+      <div class="kpi-value green">$4.04M</div>
+      <div class="kpi-sub">5-year total excl. 2026 partial</div>
     </div>
     <div class="panel warn">
       <div class="panel-title">Units Exceeding $30K/Yr <span class="aemp-tag">R&M INTENSITY</span></div>
@@ -604,23 +604,23 @@
   <div class="panel-grid-4">
     <div class="panel">
       <div class="panel-title">2021 Total R&M</div>
-      <div class="kpi-value">$288K</div>
-      <div class="kpi-sub">9-month partial year</div>
+      <div class="kpi-value">$352K</div>
+      <div class="kpi-sub">Apr–Dec 2021 (9 months)</div>
     </div>
     <div class="panel">
       <div class="panel-title">2022 Total R&M</div>
-      <div class="kpi-value accent">$539K</div>
-      <div class="kpi-sub"><span class="kpi-delta up">▲ +87%</span> vs 2021</div>
+      <div class="kpi-value accent">$637K</div>
+      <div class="kpi-sub"><span class="kpi-delta up">▲ +81%</span> vs 2021</div>
     </div>
     <div class="panel">
       <div class="panel-title">2023 Total R&M</div>
-      <div class="kpi-value warn">$784K</div>
-      <div class="kpi-sub"><span class="kpi-delta up">▲ +46%</span> vs 2022</div>
+      <div class="kpi-value warn">$910K</div>
+      <div class="kpi-sub"><span class="kpi-delta up">▲ +43%</span> vs 2022</div>
     </div>
     <div class="panel">
       <div class="panel-title">2024 Total R&M</div>
-      <div class="kpi-value green">$760K</div>
-      <div class="kpi-sub"><span class="kpi-delta down">▼ -3%</span> vs 2023 ✓</div>
+      <div class="kpi-value green">$878K</div>
+      <div class="kpi-sub"><span class="kpi-delta down">▼ -4%</span> vs 2023 ✓</div>
     </div>
   </div>
 
@@ -1377,17 +1377,19 @@
 // ============================================================
 const data = {
   years: ['2021','2022','2023','2024','2025','2026'],
-  totals: [0, 0, 0, 0, 0, 0],
-  pm: [0, 0, 0, 0, 0, 0],
-  repair: [0, 0, 0, 0, 0, 0],
+  totals: [352298, 636911, 910494, 878015, 1264569, 438509],
+  pm:     [197667, 271840, 380342, 352089, 446441,  197554],
+  repair: [154630, 365071, 530151, 525926, 818127,  240955],
 
   fleetTrend: {
-    'Excavators':       [0, 0, 0, 0, 0, 1082500],
-    'Dozers':           [0, 0, 0, 0, 0, 881476],
-    'Art. Trucks':      [0, 0, 0, 0, 0, 654436],
-    'Rollers':          [0, 0, 0, 0, 0, 345806],
-    'Loaders':          [0, 0, 0, 0, 0, 296195],
-    'Support':          [0, 0, 0, 0, 0, 308680],
+    'Excavators':       [74301,  143217, 219351, 193742, 280806, 170959],
+    'Dozers':           [78587,  163426, 148484, 161684, 290332,  48811],
+    'Art. Trucks':      [23896,   37368, 151601, 143104, 253862,  45295],
+    'Trucks/Vehicles':  [69707,  132417, 168759, 191339, 150968, 106399],
+    'Rollers':          [30444,   80254,  51922,  39567, 127612,  16005],
+    'Loaders':          [16749,   49960,  81747,  63350,  62264,  22121],
+    'Support':          [50270,   18577,  71960,  79768,  70392,  17711],
+    'Trailers':         [ 8341,   11688,  16666,   5458,  28329,  11203],
   },
 
   top10_2024: [
@@ -1459,9 +1461,11 @@ const classColors = {
   'Excavators': '#2563eb',
   'Dozers': '#d97706',
   'Art. Trucks': '#059669',
+  'Trucks/Vehicles': '#0891b2',
   'Rollers': '#7c3aed',
   'Loaders': '#db2777',
   'Support': '#64748b',
+  'Trailers': '#94a3b8',
 };
 
 function fmt$(n) {
